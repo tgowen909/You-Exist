@@ -803,7 +803,7 @@ class achievements(): # Notification("Description").with_subtitle("Title").send(
         global insanity
         if Crazy_Dave_Gotten == False:
             if insanity >= (10): # can change
-                Notification("Reach an Insanity score of 10").with_subtitle("Crazy Dave").with_title("You Exist")._with_content_image(os.path.join(GAME_FOLDER, "Images", "icon.png")).send()
+                Notification("Reach an Insanity score of 10").with_subtitle("Crazy Dave").with_title("You Exist").send()
                 play_sound("Crazy_Dave.wav")
                 Crazy_Dave_Gotten = True
             else:
