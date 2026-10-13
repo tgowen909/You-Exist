@@ -116,6 +116,9 @@ def set_terminal_colours():
                     -- Window title: the app itself is called "You Exist", so the title
                     -- is just the program's name, with all the extras switched off
                     try
+                        set custom title of t to ""
+                    end try
+                    try
                         set title displays custom title of t to false
                     end try
                     try
