@@ -13,6 +13,15 @@ BRANCH = "main"
 
 import os
 import sys
+import subprocess
+
+# When the app is opened from Finder, the Dock or Launchpad, it isn't running inside
+# a terminal window yet. In that case, ask Terminal to open a window and run this
+# same program inside it, then quit. (Inside Terminal, the game starts normally.)
+if getattr(sys, "frozen", False) and not sys.stdin.isatty():
+    subprocess.Popen(["open", "-a", "Terminal", sys.executable])
+    sys.exit()
+
 import ssl
 import json
 import shutil
