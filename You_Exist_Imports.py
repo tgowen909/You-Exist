@@ -397,7 +397,7 @@ def rp(inp):
         inp = inp.replace(symbol, '')
     return inp
 
-import termios, tty, select
+import termios, select   # (not tty: it isn't packed into the app)
 
 def wait():
     # Waits for any key press, without showing it on screen.
@@ -406,7 +406,12 @@ def wait():
     fd = sys.stdin.fileno()
     old_settings = termios.tcgetattr(fd)
     try:
-        tty.setcbreak(fd)          # read single keys, don't echo them
+        # Read single keys, and don't show them on screen
+        new_settings = termios.tcgetattr(fd)
+        new_settings[3] &= ~(termios.ECHO | termios.ICANON)
+        new_settings[6][termios.VMIN] = 1
+        new_settings[6][termios.VTIME] = 0
+        termios.tcsetattr(fd, termios.TCSANOW, new_settings)
         os.read(fd, 1)
         # Keys like the arrows send several characters at once: swallow the rest,
         # so one press only ever moves the story on by one line

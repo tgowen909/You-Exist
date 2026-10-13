@@ -8,7 +8,7 @@
 # ============================================================
 
 GITHUB_USER = "tgowen909"
-GITHUB_REPO = "You-Exist"
+GITHUB_REPO = "You-Exist"              # <-- change this if your repository has a different name
 BRANCH = "main"
 
 import os
@@ -28,7 +28,7 @@ import urllib.parse
 # If the game ever starts using a NEW library, add it here and rebuild the app.
 import __future__
 import subprocess, time, random, signal, readline, math, textwrap
-import re, builtins, platform, threading
+import re, builtins, platform, threading, termios, tty, select
 import termcolor
 import pynput.keyboard
 from aquaui.notification.native_notification import Notification
