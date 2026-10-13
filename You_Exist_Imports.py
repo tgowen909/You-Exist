@@ -88,6 +88,43 @@ class WindowSize:
         os.environ['COLUMNS'] = str(self.columns)
 
 size = WindowSize()
+##### Window colours #####
+# Mac Terminal lets other programs change the colours of a single tab, so the game
+# sets its own tab to a dark background and light text when it starts. This only
+# affects the game's window: the player's Terminal settings and other windows are
+# left alone. In VS Code (or other terminal apps) this does nothing.
+BACKGROUND_COLOUR = (30, 30, 30)      # match this to VS Code's terminal background
+TEXT_COLOUR = (220, 220, 220)         # normal, uncoloured text
+
+def set_terminal_colours():
+    if os.environ.get("TERM_PROGRAM") != "Apple_Terminal":
+        return
+    try:
+        my_tab = os.ttyname(1)   # e.g. /dev/ttys003, identifies the game's own tab
+    except OSError:
+        return
+    to_apple = lambda rgb: "{" + ", ".join(str(v * 257) for v in rgb) + "}"   # Terminal uses 0-65535
+    script = f"""
+    tell application "Terminal"
+        repeat with w in windows
+            repeat with t in tabs of w
+                if tty of t is "{my_tab}" then
+                    set background color of t to {to_apple(BACKGROUND_COLOUR)}
+                    set normal text color of t to {to_apple(TEXT_COLOUR)}
+                    set bold text color of t to {to_apple(TEXT_COLOUR)}
+                end if
+            end repeat
+        end repeat
+    end tell
+    """
+    try:
+        subprocess.run(["osascript", "-e", script], timeout=5,
+                       stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass   # if it doesn't work, the game still runs with the player's normal colours
+
+set_terminal_colours()
+
 ##### Half-screen, no-memory display #####
 # Old version (worked in VS Code but not in Terminal):
 # command = "tput csr 1 $((LINES/2))"
