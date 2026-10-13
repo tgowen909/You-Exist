@@ -1,0 +1,5 @@
+This is the output of my Python script.
+This is the output of my Python script.
+This is the output of my Python script.
+It will be written to both the terminal and the output file. bold red
+Enter your name: 
