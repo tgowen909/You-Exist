@@ -88,13 +88,14 @@ class WindowSize:
         os.environ['COLUMNS'] = str(self.columns)
 
 size = WindowSize()
-##### Window colours #####
+##### Window colours and title #####
 # Mac Terminal lets other programs change the colours of a single tab, so the game
 # sets its own tab to a dark background and light text when it starts. This only
 # affects the game's window: the player's Terminal settings and other windows are
 # left alone. In VS Code (or other terminal apps) this does nothing.
 BACKGROUND_COLOUR = (20, 20, 20)      # match this to VS Code's terminal background
 TEXT_COLOUR = (220, 220, 220)         # normal, uncoloured text
+WINDOW_TITLE = "You Exist"
 
 def set_terminal_colours():
     if os.environ.get("TERM_PROGRAM") != "Apple_Terminal":
@@ -112,6 +113,26 @@ def set_terminal_colours():
                     set background color of t to {to_apple(BACKGROUND_COLOUR)}
                     set normal text color of t to {to_apple(TEXT_COLOUR)}
                     set bold text color of t to {to_apple(TEXT_COLOUR)}
+                    -- Window title: show "You Exist" and nothing else
+                    try
+                        set custom title of t to "{WINDOW_TITLE}"
+                        set title displays custom title of t to true
+                    end try
+                    try
+                        set title displays device name of t to false
+                    end try
+                    try
+                        set title displays shell path of t to false
+                    end try
+                    try
+                        set title displays window size of t to false
+                    end try
+                    try
+                        set title displays settings name of t to false
+                    end try
+                    try
+                        set title displays file name of t to false
+                    end try
                 end if
             end repeat
         end repeat
@@ -124,6 +145,10 @@ def set_terminal_colours():
         pass   # if it doesn't work, the game still runs with the player's normal colours
 
 set_terminal_colours()
+
+# Also set the title the standard way, which works in most other terminal apps too
+sys.stdout.write(f"\033]0;{WINDOW_TITLE}\007")
+sys.stdout.flush()
 
 ##### Half-screen, no-memory display #####
 # Old version (worked in VS Code but not in Terminal):
