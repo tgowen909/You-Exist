@@ -93,7 +93,7 @@ size = WindowSize()
 # sets its own tab to a dark background and light text when it starts. This only
 # affects the game's window: the player's Terminal settings and other windows are
 # left alone. In VS Code (or other terminal apps) this does nothing.
-BACKGROUND_COLOUR = (30, 30, 30)      # match this to VS Code's terminal background
+BACKGROUND_COLOUR = (20, 20, 20)      # match this to VS Code's terminal background
 TEXT_COLOUR = (220, 220, 220)         # normal, uncoloured text
 
 def set_terminal_colours():
