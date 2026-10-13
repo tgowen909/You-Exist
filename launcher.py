@@ -7,8 +7,8 @@
 #  (or, on the very first launch, the copy packed inside the app).
 # ============================================================
 
-GITHUB_USER = "your-github-username"   # <-- CHANGE THIS to your GitHub username
-GITHUB_REPO = "You-Exist"              # <-- change this if your repository has a different name
+GITHUB_USER = "tgowen909"
+GITHUB_REPO = "You-Exist"
 BRANCH = "main"
 
 import os
