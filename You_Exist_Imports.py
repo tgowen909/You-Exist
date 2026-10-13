@@ -146,10 +146,13 @@ def set_terminal_colours():
 
 set_terminal_colours()
 
-# Clear the folder name and folder icon Terminal shows in the title,
-# then set the title the standard way, which works in most other terminal apps
+# Clear the folder name and folder icon Terminal shows in the title
 sys.stdout.write("\033]7;\007\033]6;\007")
-sys.stdout.write(f"\033]0;{WINDOW_TITLE}\007")
+# In other terminal apps, set the title the standard way. (Not in Mac Terminal:
+# there the program's own name, "You Exist", already is the title, and this
+# would add a second copy.)
+if os.environ.get("TERM_PROGRAM") != "Apple_Terminal":
+    sys.stdout.write(f"\033]0;{WINDOW_TITLE}\007")
 sys.stdout.flush()
 
 ##### Half-screen, no-memory display #####
