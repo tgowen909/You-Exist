@@ -113,10 +113,10 @@ def set_terminal_colours():
                     set background color of t to {to_apple(BACKGROUND_COLOUR)}
                     set normal text color of t to {to_apple(TEXT_COLOUR)}
                     set bold text color of t to {to_apple(TEXT_COLOUR)}
-                    -- Window title: show "You Exist" and nothing else
+                    -- Window title: the app itself is called "You Exist", so the title
+                    -- is just the program's name, with all the extras switched off
                     try
-                        set custom title of t to "{WINDOW_TITLE}"
-                        set title displays custom title of t to true
+                        set title displays custom title of t to false
                     end try
                     try
                         set title displays device name of t to false
@@ -146,7 +146,9 @@ def set_terminal_colours():
 
 set_terminal_colours()
 
-# Also set the title the standard way, which works in most other terminal apps too
+# Clear the folder name and folder icon Terminal shows in the title,
+# then set the title the standard way, which works in most other terminal apps
+sys.stdout.write("\033]7;\007\033]6;\007")
 sys.stdout.write(f"\033]0;{WINDOW_TITLE}\007")
 sys.stdout.flush()
 
@@ -386,7 +388,8 @@ def play_sound(filename):
     # built-in afplay command (no extra libraries needed). Missing files are skipped.
     path = os.path.join(GAME_FOLDER, "Audio", filename)
     if os.path.exists(path):
-        subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         start_new_session=True)
 
 def rp(inp):
     punctuation = "\'().,"
@@ -394,9 +397,23 @@ def rp(inp):
         inp = inp.replace(symbol, '')
     return inp
 
+import termios, tty, select
+
 def wait():
+    # Waits for any key press, without showing it on screen.
+    # (Used to run bash for this, which made "bash" appear in the window title.)
     sys.stdout.flush()
-    os.system("/bin/bash -c 'read -s -n 1 -p \"\"'")
+    fd = sys.stdin.fileno()
+    old_settings = termios.tcgetattr(fd)
+    try:
+        tty.setcbreak(fd)          # read single keys, don't echo them
+        os.read(fd, 1)
+        # Keys like the arrows send several characters at once: swallow the rest,
+        # so one press only ever moves the story on by one line
+        while select.select([fd], [], [], 0.01)[0]:
+            os.read(fd, 64)
+    finally:
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 def p(text):
     print(textwrap.fill(text, width=int(os.environ['COLUMNS']))) # also include line spacing here when it's being implemented
