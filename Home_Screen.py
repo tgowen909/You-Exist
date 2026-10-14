@@ -568,6 +568,59 @@ def input_with_menu(prompt=""):
             back_to_home_screen()
 
 
+# ---------- Version (shown at the bottom of the home screen) ----------
+# Shows the date of the latest update, worked out automatically from GitHub:
+# the launcher remembers which version it downloaded, and the date of that
+# version is looked up once (then saved, so it's instant from then on).
+GITHUB_USER = "tgowen909"
+GITHUB_REPO = "You-Exist"
+APP_FOLDER = os.path.expanduser("~/Library/Application Support/You Exist")
+_version_text = None
+
+def version_text():
+    global _version_text
+    if _version_text is not None:
+        return _version_text
+    _version_text = ""
+    game_folder = os.path.join(APP_FOLDER, "game")
+    if not os.path.abspath(game.__file__).startswith(game_folder + os.sep):
+        _version_text = "Testing version (not the downloaded game)"   # e.g. running in VS Code
+        return _version_text
+    try:
+        with open(os.path.join(APP_FOLDER, "version.txt")) as f:
+            sha = f.read().strip()
+    except OSError:
+        return _version_text          # no download yet (first launch without internet)
+    cache_file = os.path.join(APP_FOLDER, "version_date.json")
+    try:
+        with open(cache_file) as f:
+            cached = json.load(f)
+        if cached.get("sha") == sha:
+            _version_text = f"Updated {cached['date']}"
+            return _version_text
+    except (OSError, ValueError, KeyError):
+        pass
+    try:
+        import ssl
+        try:
+            import certifi
+            context = ssl.create_default_context(cafile=certifi.where())
+        except ImportError:
+            context = ssl.create_default_context()
+        request = urllib.request.Request(f"https://api.github.com/repos/{GITHUB_USER}/{GITHUB_REPO}/commits/{sha}",
+                                         headers={"User-Agent": "You-Exist-launcher"})
+        with urllib.request.urlopen(request, timeout=3, context=context) as response:
+            when = json.loads(response.read())["commit"]["committer"]["date"]
+        local = datetime.datetime.fromisoformat(when.replace("Z", "+00:00")).astimezone()
+        date = local.strftime("%-d %b %Y")
+        with open(cache_file, "w") as f:
+            json.dump({"sha": sha, "date": date}, f)
+        _version_text = f"Updated {date}"
+    except Exception:
+        pass                          # no internet: just don't show it this time
+    return _version_text
+
+
 # ---------- The home screen itself ----------
 def home_screen(namespace=None):
     """Show the home screen. Pass globals() from You_Exist.py so the chosen run's
@@ -592,6 +645,12 @@ def home_screen(namespace=None):
                 print("\n" * max(0, game.size.lines // 4 - 3), end="")
                 draw_title()
                 draw_menu(options, selected)
+                version = version_text()
+                if version:
+                    # bottom line of the window, small and grey
+                    sys.stdout.write(f"\033[{game.size.lines};1H")
+                    sys.stdout.write(centred(colour(DIM_COLOUR, fit(version, game.size.columns - 2)), min(len(version), game.size.columns - 2)))
+                    sys.stdout.flush()
             picked = choose(options, draw, picked)
             if picked is None or options[picked] == "Quit":
                 clear()
