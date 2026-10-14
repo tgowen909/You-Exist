@@ -966,5 +966,37 @@ class achievements(): # Notification("Description").with_subtitle("Title").send(
 
     
 
+##### Launch counter #####
+# Each time the game starts, this quietly tells GoatCounter "someone launched the game",
+# so you can see launches on your GoatCounter dashboard. It runs in the background,
+# never slows the game down, and silently gives up if there's no internet.
+LAUNCH_COUNTER = "https://tgowen909.goatcounter.com/count"   # <-- put your GoatCounter code here
 
+def count_launch():
+    if "YOURCODE" in LAUNCH_COUNTER:
+        return   # not set up yet
+    if os.environ.get("TERM_PROGRAM") == "vscode":
+        return   # don't count your own test runs in VS Code
+
+    def send():
+        try:
+            import urllib.request, urllib.parse, ssl
+            try:
+                import certifi
+                context = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                context = ssl.create_default_context()
+            params = urllib.parse.urlencode({"p": "/launch", "t": "Game launched", "rnd": random.random()})
+            request = urllib.request.Request(
+                f"{LAUNCH_COUNTER}?{params}",
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) You-Exist-game"},
+            )
+            urllib.request.urlopen(request, timeout=5, context=context)
+        except Exception:
+            pass
+
+    import threading
+    threading.Thread(target=send, daemon=True).start()
+
+count_launch()
 
