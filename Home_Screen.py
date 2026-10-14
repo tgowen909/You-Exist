@@ -298,11 +298,16 @@ def start_new_run():
                             unfinished, "Cancel")
         if replaced is None:
             return None
-        unfinished.remove(replaced)
+    else:
+        replaced = None
     runs = all_runs()
     number = max((run["number"] for run in runs), default=0) + 1
     run = {"number": number, "started": now(), "last_played": now(), "finished": False, "checkpoint": None}
-    # Keep only runs that can still be continued (finished runs and the replaced one are dropped)
+    if replaced is not None:
+        # The old run is only removed once the new one is actually saved (after its first
+        # life), so abandoning the new run early doesn't lose the old one for nothing
+        run["replaces"] = replaced["number"]
+    # Keep only runs that can still be continued (finished and never-saved runs are dropped)
     runs[:] = [r for r in runs if r in unfinished] + [run]
     game.current_run = run
     save_progress()
@@ -392,10 +397,19 @@ def apply_run(run, namespace):
             namespace[name] = value
 
 def start_of_life(namespace):
-    """Call at the start of each life: saves the run so it can be continued from here."""
+    """Call at the start of each life: saves the run so it can be continued from here.
+    A brand new run isn't saved until its first life is over, since continuing it
+    would just be the same as starting fresh."""
     run = getattr(game, "current_run", None)
     if run is None:
         return
+    if run.get("checkpoint") is None and namespace.get("lives_lived", 0) == 0:
+        return   # first life of a new run: nothing worth saving yet
+    if "replaces" in run:
+        # Now that this run is being saved, it takes over the slot the player chose
+        runs = all_runs()
+        runs[:] = [r for r in runs if r.get("number") != run["replaces"] or r is run]
+        del run["replaces"]
     checkpoint = {name: namespace.get(name, getattr(game, name, 0)) for name in RUN_VARIABLES}
     checkpoint.update({name: getattr(game, name, 0) for name in POINTS})
     run["checkpoint"] = checkpoint
@@ -423,7 +437,11 @@ def back_to_home_screen():
         os.execv(sys.executable, [sys.executable] + sys.argv)       # running in VS Code
 
 def ask_to_leave():
-    """Shows a one-line question. Returns True if the player wants to go home."""
+    """Shows a one-line question. Returns True if the player wants to go home.
+    During a new run's first life there's nothing to lose, so it doesn't ask."""
+    run = getattr(game, "current_run", None)
+    if run is None or run.get("checkpoint") is None:
+        return True
     question = "Return to the home screen? You'll continue from the start of this life.  (Enter/Space: Yes. Any other key: No)"
     question = fit(question, game.size.columns - 1)
     sys.stdout.write("\r\033[2K")
