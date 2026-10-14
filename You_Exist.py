@@ -17,11 +17,12 @@ def resource_path(name):
 
 #pygame.mixer.music.fadeout()
 
-from Home_Screen import home_screen
-home_screen()
+from Home_Screen import home_screen, start_of_life, finish_run
+home_screen(globals())
 
 ##### Story #####
 while True:
+    start_of_life(globals())
     cprint("You exist.", attrs=["bold"])
     points.ponder(0)
     points.charisma(0)
@@ -668,7 +669,7 @@ being("Too late, you're gone.") # should your memories be wiped, and then the be
 # The being has no physical body (incorporeal) that can be seen. 
 # It does actually have a physical form, but no sight as it exists can perceive it, or survive perceiving it.
 
-
+finish_run()
 
 print("balls")
 print("(There's no more after this, but there will be eventually.)")

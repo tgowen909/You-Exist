@@ -3,9 +3,10 @@
 #  Shows a menu before the game starts: Play, Achievements, Quit.
 #  Use the arrow keys (or the number keys) and Enter. Esc or Q goes back.
 #
-#  Runs (for later): the save file can already hold several "runs" at once.
-#  Once the game can save its progress (see save_checkpoint at the bottom),
-#  Play will automatically offer to continue any unfinished run, or start a new one.
+#  Runs: each playthrough is a "run". Progress is saved at the start of every life,
+#  so a run can be continued later from the start of the life the player was on.
+#  Pressing Esc while the story is waiting for a key (or typing "menu" at a choice)
+#  returns to the home screen.
 # ============================================================
 
 import os
@@ -15,6 +16,8 @@ import time
 import select
 import termios
 import datetime
+import json
+import builtins
 
 import You_Exist_Imports as game
 
@@ -118,6 +121,61 @@ def choose(options, draw_screen, selected=0):
             return int(key) - 1
 
 
+def choose_paged(items, fixed, heading=None):
+    """A menu that splits a long list of items over several pages if the window
+    is too short. The fixed options (like Back) appear on every page.
+    Returns ("item", position in items), ("fixed", position in fixed), or None for Esc."""
+    page = 0
+    selected = 0
+    while True:
+        overhead = 3 + (2 if heading else 0) + 1 + len(fixed) + 3   # title, heading, gap, fixed options, hints
+        per_page = max(1, game.size.lines - overhead)
+        pages = max(1, -(-len(items) // per_page))
+        page = min(page, pages - 1)
+        shown = items[page * per_page:(page + 1) * per_page]
+        options = shown + fixed
+        selected = min(selected, len(options) - 1)
+
+        clear()
+        draw_title()
+        if heading:
+            print(centred(colour(UNLOCKED_COLOUR, fit(heading, game.size.columns - 2)), min(len(heading), game.size.columns - 2)))
+            print()
+        width = game.size.columns - 4
+        for i, option in enumerate(options):
+            if i == len(shown) and shown:
+                print()                                  # gap between the list and the fixed options
+            text = fit(option, width)
+            if i == selected:
+                print(centred(colour(HIGHLIGHT_COLOUR, f"›  {text}", bold=True), len(text) + 3))
+            else:
+                print(centred(colour(DIM_COLOUR, f"   {text}"), len(text) + 3))
+        print()
+        hint = "↑ ↓ to move, Enter to select"
+        if pages > 1:
+            hint = f"Page {page + 1} of {pages}   ← → to turn the page   " + hint
+        print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
+        sys.stdout.flush()
+
+        key = read_key()
+        if key == "up":
+            selected = (selected - 1) % len(options)
+        elif key == "down":
+            selected = (selected + 1) % len(options)
+        elif key == "right" and page < pages - 1:
+            page += 1
+        elif key == "left" and page > 0:
+            page -= 1
+        elif key == "back":
+            return None
+        elif key == "enter" or (key and key.isdigit() and 1 <= int(key) <= len(options)):
+            if key != "enter":
+                selected = int(key) - 1
+            if selected < len(shown):
+                return ("item", page * per_page + selected)
+            return ("fixed", selected - len(shown))
+
+
 # ---------- Achievements ----------
 def all_achievements():
     """Read every achievement straight from You_Exist_Imports.py, so new ones
@@ -143,8 +201,16 @@ def all_achievements():
 def achievements_screen():
     page = 0
     while True:
-        # Unlocked achievements first, then locked ones (each group keeps its usual order)
-        achievements = sorted(all_achievements(), key=lambda a: not a[3])
+        # Unlocked achievements first, in the order they were earned (earliest at the top),
+        # then locked ones in their usual order. The save file lists achievements in the
+        # order they were unlocked. (To show the most recent first, add reverse() below.)
+        earned_order = list(getattr(game, "save_data", {}).get("achievements", []))
+        def sort_key(achievement):
+            name, title, description, got = achievement
+            if not got:
+                return (1, 0)
+            return (0, earned_order.index(name) if name in earned_order else len(earned_order))
+        achievements = sorted(all_achievements(), key=sort_key)
         unlocked = sum(1 for a in achievements if a[3])
         per_page = max(1, (game.size.lines - 9) // 2)   # each achievement takes two lines
         pages = max(1, -(-len(achievements) // per_page))
@@ -178,81 +244,245 @@ def achievements_screen():
             return
 
 
-# ---------- Runs (ready for saving progress later) ----------
+# ---------- Runs ----------
+# Variables that belong to the current run, and are saved at the start of every life
+RUN_VARIABLES = ["lives_lived", "all_there_is", "first_person", "physical_form"]
+POINTS = ["ponder", "charisma", "physicality", "confidence", "morality", "insanity"]
+MAX_UNFINISHED_RUNS = 7    # save slots: when they're all full, the player picks one to replace
+
+# In VS Code, achievements aren't saved, but runs are kept in a separate testing file
+# so you can still test continuing a run. Delete that file to clear your test runs.
+TESTING_RUNS_FILE = os.path.expanduser("~/Library/Application Support/You Exist/runs (testing).json")
+_testing_data = None
+
+def _run_store():
+    global _testing_data
+    if getattr(game, "SAVING_ON", False) and hasattr(game, "save_data"):
+        return game.save_data
+    if _testing_data is None:
+        try:
+            with open(TESTING_RUNS_FILE) as f:
+                _testing_data = json.load(f)
+        except (OSError, ValueError):
+            _testing_data = {}
+    return _testing_data
+
 def all_runs():
-    return game.save_data.setdefault("runs", []) if hasattr(game, "save_data") else []
+    return _run_store().setdefault("runs", [])
 
 def resumable_runs():
-    # A run can be continued once it has a checkpoint and hasn't finished
-    return [run for run in all_runs() if run.get("checkpoint") and not run.get("finished")]
+    # A run can be continued once it has a checkpoint and hasn't finished (newest first)
+    runs = [run for run in all_runs() if run.get("checkpoint") and not run.get("finished")]
+    return sorted(runs, key=lambda run: run.get("last_played", ""), reverse=True)
 
 def save_progress():
     if getattr(game, "SAVING_ON", False) and hasattr(game, "write_save"):
         game.write_save(game.save_data)
+        return
+    try:
+        os.makedirs(os.path.dirname(TESTING_RUNS_FILE), exist_ok=True)
+        with open(TESTING_RUNS_FILE, "w") as f:
+            json.dump(_run_store(), f, indent=2)
+    except OSError:
+        pass
+
+def now():
+    return datetime.datetime.now().isoformat(timespec="minutes")
 
 def start_new_run():
+    """Start a new run. If every save slot is full, the player chooses which run
+    to replace. Returns the new run, or None if they cancel."""
+    unfinished = resumable_runs()
+    if len(unfinished) >= MAX_UNFINISHED_RUNS:
+        replaced = pick_run(f"All {MAX_UNFINISHED_RUNS} save slots are full. Which run should the new one replace?",
+                            unfinished, "Cancel")
+        if replaced is None:
+            return None
+        unfinished.remove(replaced)
     runs = all_runs()
-    now = datetime.datetime.now().isoformat(timespec="minutes")
     number = max((run["number"] for run in runs), default=0) + 1
-    run = {"number": number, "started": now, "last_played": now, "finished": False, "checkpoint": None}
-    runs.append(run)
-    # Keep the save file tidy: forget old runs that can't be continued anyway
-    keep = [r for r in runs if r.get("checkpoint") and not r.get("finished")]
-    runs[:] = keep + [r for r in runs if r not in keep][-10:]
+    run = {"number": number, "started": now(), "last_played": now(), "finished": False, "checkpoint": None}
+    # Keep only runs that can still be continued (finished runs and the replaced one are dropped)
+    runs[:] = [r for r in runs if r in unfinished] + [run]
     game.current_run = run
     save_progress()
     return run
 
-def describe_run(run):
-    def nice(when):
-        try:
-            return datetime.datetime.fromisoformat(when).strftime("%-d %b, %-I:%M%p").replace("AM", "am").replace("PM", "pm")
-        except (TypeError, ValueError):
-            return "?"
-    return f"Continue run {run['number']} (last played {nice(run.get('last_played'))})"
+def nice_time(when):
+    try:
+        return datetime.datetime.fromisoformat(when).strftime("%-d %b, %-I:%M%p").replace("AM", "am").replace("PM", "pm")
+    except (TypeError, ValueError):
+        return "?"
 
-def choose_run():
-    """Returns the run to play: a new one, or (once saving exists) one to continue.
-    Returns None if the player backs out."""
-    unfinished = resumable_runs()
-    if not unfinished:
-        return start_new_run()          # nothing to continue, so go straight into a new run
-    options = [describe_run(run) for run in unfinished] + ["Start a new run", "Back"]
+def describe_run(run, start="Continue run"):
+    life = (run.get("checkpoint") or {}).get("lives_lived", 0) + 1
+    return f"{start} {run['number']}: life {life} (last played {nice_time(run.get('last_played'))})"
+
+def menu_with_heading(heading, options):
+    """A menu with a line of explanation above it. Returns the chosen position, or None."""
     def draw(selected):
         clear()
         draw_title()
+        if heading:
+            print(centred(colour(UNLOCKED_COLOUR, fit(heading, game.size.columns - 2)), min(len(heading), game.size.columns - 2)))
+            print()
         draw_menu(options, selected)
-    picked = choose(options, draw)
-    if picked is None or options[picked] == "Back":
-        return None
-    if options[picked] == "Start a new run":
-        return start_new_run()
-    run = unfinished[picked]
-    run["last_played"] = datetime.datetime.now().isoformat(timespec="minutes")
-    game.current_run = run
-    save_progress()
-    return run
+    return choose(options, draw)
 
-def save_checkpoint(**progress):
-    """FOR LATER: call this at a safe point in the story to save where the player is,
-    e.g. save_checkpoint(chapter="Me_and_I", ponder=3, charisma=1).
-    The game will then also need code to jump back to that chapter when a run is continued."""
-    run = getattr(game, "current_run", None)
-    if run is not None:
-        run["checkpoint"] = progress
-        run["last_played"] = datetime.datetime.now().isoformat(timespec="minutes")
+def pick_run(heading, runs, last_option):
+    """Let the player pick one of the given runs. Returns it, or None for the last option / Esc."""
+    picked = choose_paged([describe_run(run, "Run") for run in runs], [last_option], heading)
+    if picked is None or picked[0] == "fixed":
+        return None
+    return runs[picked[1]]
+
+def delete_a_run():
+    while True:
+        unfinished = resumable_runs()
+        if not unfinished:
+            return
+        run = pick_run("Which run would you like to delete?", unfinished, "Back")
+        if run is None:
+            return
+        sure = menu_with_heading(f"Delete run {run['number']}? This can't be undone.",
+                                 ["No, keep it", "Yes, delete it"])
+        if sure == 1:
+            all_runs().remove(run)
+            save_progress()
+
+def choose_run():
+    """Returns the run to play: a new one, or one to continue.
+    Returns None if the player backs out."""
+    while True:
+        unfinished = resumable_runs()
+        if not unfinished:
+            return start_new_run()      # nothing to continue, so go straight into a new run
+        empty_slots = max(0, MAX_UNFINISHED_RUNS - len(unfinished))
+        items = [describe_run(run) for run in unfinished] + ["Empty save slot"] * empty_slots
+        fixed = ["Start a new run", "Delete a run", "Back"]
+        picked = choose_paged(items, fixed)
+        if picked is None or picked == ("fixed", 2):
+            return None
+        if picked == ("fixed", 1):
+            delete_a_run()
+            continue
+        if picked == ("fixed", 0) or picked[1] >= len(unfinished):
+            # "Start a new run", or an empty save slot
+            run = start_new_run()
+            if run is not None:
+                return run
+            continue                    # they cancelled replacing a run
+        run = unfinished[picked[1]]
+        run["last_played"] = now()
+        game.current_run = run
         save_progress()
+        return run
+
+def apply_run(run, namespace):
+    """Set up the game's variables for this run: saved values when continuing,
+    starting values for a new run."""
+    saved = run.get("checkpoint") or {}
+    for name in RUN_VARIABLES + POINTS:
+        if name in saved:
+            value = saved[name]
+        else:
+            value = getattr(game, name, 0)   # the starting value from You_Exist_Imports
+        setattr(game, name, value)
+        if namespace is not None:
+            namespace[name] = value
+
+def start_of_life(namespace):
+    """Call at the start of each life: saves the run so it can be continued from here."""
+    run = getattr(game, "current_run", None)
+    if run is None:
+        return
+    checkpoint = {name: namespace.get(name, getattr(game, name, 0)) for name in RUN_VARIABLES}
+    checkpoint.update({name: getattr(game, name, 0) for name in POINTS})
+    run["checkpoint"] = checkpoint
+    run["last_played"] = now()
+    save_progress()
 
 def finish_run():
-    """FOR LATER: call this when a run reaches an ending, so it's no longer offered to continue."""
+    """Call when a run reaches its ending, so it's no longer offered to continue."""
     run = getattr(game, "current_run", None)
     if run is not None:
         run["finished"] = True
+        run["last_played"] = now()
         save_progress()
 
 
+# ---------- Getting back to the home screen ----------
+def back_to_home_screen():
+    """Restart the game, which brings up the home screen. The run was saved
+    at the start of this life, so it can be continued from there."""
+    sys.stdout.write("\033[r\033[?25h")
+    sys.stdout.flush()
+    if getattr(sys, "frozen", False):
+        os.execv(sys.executable, [sys.executable])                  # the built app
+    else:
+        os.execv(sys.executable, [sys.executable] + sys.argv)       # running in VS Code
+
+def ask_to_leave():
+    """Shows a one-line question. Returns True if the player wants to go home."""
+    question = "Return to the home screen? You'll continue from the start of this life.  (Enter: yes, any other key: no)"
+    question = fit(question, game.size.columns - 1)
+    sys.stdout.write("\r\033[2K")
+    sys.stdout.write(colour(DIM_COLOUR, question))
+    sys.stdout.flush()
+    answer = read_key()
+    sys.stdout.write("\r\033[2K")        # rub the question out again
+    sys.stdout.flush()
+    if hasattr(sys.stdout, "col"):
+        sys.stdout.col = 0
+    return answer == "enter"
+
+def wait():
+    """Waits for a key press, like before, but Esc offers to go back to the home screen."""
+    sys.stdout.flush()
+    fd = sys.stdin.fileno()
+    while True:
+        old_settings = termios.tcgetattr(fd)
+        new_settings = termios.tcgetattr(fd)
+        new_settings[3] &= ~(termios.ECHO | termios.ICANON)
+        new_settings[6][termios.VMIN] = 1
+        new_settings[6][termios.VTIME] = 0
+        termios.tcsetattr(fd, termios.TCSANOW, new_settings)
+        try:
+            data = os.read(fd, 1)
+            while select.select([fd], [], [], 0.02)[0]:
+                data += os.read(fd, 64)
+        finally:
+            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
+        if data != b"\x1b":            # anything but a lone Esc: carry on with the story
+            return
+        if ask_to_leave():
+            back_to_home_screen()
+        # they said no: keep waiting for a key to continue the story
+
+_original_input = builtins.input
+def input_with_menu(prompt=""):
+    """Typing "menu" at any choice also offers to go back to the home screen."""
+    while True:
+        answer = _original_input(prompt)
+        if answer.strip().lower() != "menu":
+            return answer
+        if ask_to_leave():
+            back_to_home_screen()
+
+
 # ---------- The home screen itself ----------
-def home_screen():
+def home_screen(namespace=None):
+    """Show the home screen. Pass globals() from You_Exist.py so the chosen run's
+    progress can be loaded into the game."""
+    # Keep the run's variables out of "import *", so the chapter files (which start
+    # with "from You_Exist_Imports import *") can't reset them partway through a run
+    game.__all__ = [name for name in vars(game) if not name.startswith("_") and name not in RUN_VARIABLES]
+    # Swap in the versions of wait() and input() that know about the home screen
+    game.wait = wait
+    builtins.input = input_with_menu
+    if namespace is not None:
+        namespace["wait"] = wait
+
     sys.stdout.write("\033[r\033[?25l")   # use the whole window, and hide the cursor
     try:
         options = ["Play", "Achievements", "Quit"]
@@ -272,7 +502,9 @@ def home_screen():
             if options[picked] == "Achievements":
                 achievements_screen()
             elif options[picked] == "Play":
-                if choose_run() is not None:
+                run = choose_run()
+                if run is not None:
+                    apply_run(run, namespace)
                     return
     finally:
         # Put the screen back exactly how the story expects it
