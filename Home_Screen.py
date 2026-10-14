@@ -20,7 +20,8 @@ import You_Exist_Imports as game
 
 # ---------- Settings ----------
 SHOW_LOCKED_DESCRIPTIONS = False    # False: locked achievements show "???" instead of how to get them
-TITLE_COLOUR = (126, 58, 56)        # the being's red
+# The title uses whatever colour the being's text uses, so the two always match
+TITLE_COLOUR = getattr(game, "EXACT_COLOURS", {}).get(("red", ("bold", "dark")), (126, 58, 56))
 DIM_COLOUR = (102, 102, 102)        # locked achievements and hints
 HIGHLIGHT_COLOUR = (220, 220, 220)  # the selected menu option
 UNLOCKED_COLOUR = (220, 220, 220)
@@ -28,8 +29,11 @@ UNLOCKED_COLOUR = (220, 220, 220)
 
 # ---------- Drawing helpers ----------
 def colour(rgb, text, bold=False):
+    # Bold is sent as its own code, separate from the colour, so the game's
+    # older-Terminal colour fallback can recognise and convert the colour
     r, g, b = rgb
-    return f"{chr(27)}[{'1;' if bold else ''}38;2;{r};{g};{b}m{text}{chr(27)}[0m"
+    bold_code = "\033[1m" if bold else ""
+    return f"{bold_code}\033[38;2;{r};{g};{b}m{text}\033[0m"
 
 def clear():
     # \033[r = use the whole window (resizing the window resets the game's half-screen area)
