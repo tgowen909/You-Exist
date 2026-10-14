@@ -248,7 +248,7 @@ def achievements_screen():
 # Variables that belong to the current run, and are saved at the start of every life
 RUN_VARIABLES = ["lives_lived", "all_there_is", "first_person", "physical_form"]
 POINTS = ["ponder", "charisma", "physicality", "confidence", "morality", "insanity"]
-MAX_UNFINISHED_RUNS = 7    # save slots: when they're all full, the player picks one to replace
+MAX_UNFINISHED_RUNS = 10    # save slots: when they're all full, the player picks one to replace
 
 # In VS Code, achievements aren't saved, but runs are kept in a separate testing file
 # so you can still test continuing a run. Delete that file to clear your test runs.
@@ -358,10 +358,12 @@ def delete_a_run():
 def choose_run():
     """Returns the run to play: a new one, or one to continue.
     Returns None if the player backs out."""
+    first_visit = True
     while True:
         unfinished = resumable_runs()
-        if not unfinished:
-            return start_new_run()      # nothing to continue, so go straight into a new run
+        if not unfinished and first_visit:
+            return start_new_run()      # nothing saved when Play was pressed, so go straight into a new run
+        first_visit = False             # once the save slots have been shown, stay on them (even if they're all empty)
         empty_slots = max(0, MAX_UNFINISHED_RUNS - len(unfinished))
         items = [describe_run(run) for run in unfinished] + ["Empty save slot"] * empty_slots
         fixed = ["Start a new run", "Delete a run", "Back"]
