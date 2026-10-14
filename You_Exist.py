@@ -17,6 +17,8 @@ def resource_path(name):
 
 #pygame.mixer.music.fadeout()
 
+from Home_Screen import home_screen
+home_screen()
 
 ##### Story #####
 while True:
