@@ -1000,3 +1000,54 @@ def count_launch():
 
 count_launch()
 
+
+
+##### Saved achievements #####
+# Remembers which achievements a player has unlocked, so they stay unlocked
+# between sessions and each one only ever pops up once.
+# The save file lives outside the game folder, because the launcher clears out
+# anything in the game folder that isn't on GitHub.
+import json
+
+SAVE_FILE = os.path.expanduser("~/Library/Application Support/You Exist/save.json")
+SAVING_ON = os.environ.get("TERM_PROGRAM") != "vscode"   # VS Code test runs start fresh and save nothing
+
+def load_save():
+    try:
+        with open(SAVE_FILE) as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}   # no save yet (or it's damaged): start fresh
+
+def write_save(data):
+    try:
+        os.makedirs(os.path.dirname(SAVE_FILE), exist_ok=True)
+        temp_file = SAVE_FILE + ".tmp"
+        with open(temp_file, "w") as f:
+            json.dump(data, f, indent=2)
+        os.replace(temp_file, SAVE_FILE)   # swap in all at once, so a crash can't half-write it
+    except OSError:
+        pass   # couldn't save: the game carries on regardless
+
+save_data = load_save() if SAVING_ON else {}
+save_data.setdefault("achievements", [])
+
+# 1. Mark everything already unlocked as "gotten", so it won't pop up again
+for name in save_data["achievements"]:
+    if f"{name}_Gotten" in globals():
+        globals()[f"{name}_Gotten"] = True
+
+# 2. Wrap every achievement so that the moment one is unlocked, it's saved
+def _save_when_unlocked(name, check):
+    def wrapper(*args, **kwargs):
+        was_gotten = globals()[f"{name}_Gotten"]
+        result = check(*args, **kwargs)
+        if not was_gotten and globals()[f"{name}_Gotten"] and SAVING_ON:
+            save_data["achievements"].append(name)
+            write_save(save_data)
+        return result
+    return staticmethod(wrapper)
+
+for name, check in list(vars(achievements).items()):
+    if callable(check) and f"{name}_Gotten" in globals():
+        setattr(achievements, name, _save_when_unlocked(name, check))
