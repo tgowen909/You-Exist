@@ -977,6 +977,8 @@ def count_launch():
         return   # not set up yet
     if os.environ.get("TERM_PROGRAM") == "vscode":
         return   # don't count your own test runs in VS Code
+    if os.environ.get("YOU_EXIST_RESTARTED"):
+        return   # returning to the home screen isn't a new launch
 
     def send():
         try:

@@ -244,6 +244,80 @@ def achievements_screen():
             return
 
 
+# ---------- Path tracking (GoatCounter) ----------
+# Sends a small signal to your GoatCounter dashboard when players reach chapters,
+# lives, achievements and endings, so you can see which paths people take.
+# Uses the LAUNCH_COUNTER address from You_Exist_Imports.py. Like the launch
+# counter, it does nothing in VS Code and silently gives up without internet.
+import threading
+import urllib.parse
+import urllib.request
+
+def track(path, title=None, wait_for_it=False):
+    counter = getattr(game, "LAUNCH_COUNTER", "")
+    if not counter or "YOURCODE" in counter or os.environ.get("TERM_PROGRAM") == "vscode":
+        return
+
+    def send():
+        try:
+            import ssl
+            try:
+                import certifi
+                context = ssl.create_default_context(cafile=certifi.where())
+            except ImportError:
+                context = ssl.create_default_context()
+            params = urllib.parse.urlencode({"p": path, "t": title or path, "rnd": time.time()})
+            request = urllib.request.Request(
+                f"{counter}?{params}",
+                headers={"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) You-Exist-game"},
+            )
+            urllib.request.urlopen(request, timeout=3, context=context)
+        except Exception:
+            pass
+
+    thread = threading.Thread(target=send, daemon=True)
+    thread.start()
+    if wait_for_it:
+        thread.join(timeout=3)   # for signals sent just before the game restarts
+
+def track_chapters(namespace):
+    """Every chapter file is opened through resource_path(), so wrapping it
+    records each chapter a player reaches, without touching the chapter files."""
+    original = namespace.get("resource_path")
+    if original is None or getattr(original, "_tracked", False):
+        return
+    def resource_path(name):
+        if name.endswith(".py"):
+            chapter = name[:-3]
+            track(f"/chapter/{chapter}", f"Chapter: {chapter.replace('_', ' ')}")
+        return original(name)
+    resource_path._tracked = True
+    namespace["resource_path"] = resource_path
+
+def track_achievements():
+    """Records each achievement the moment a player unlocks it."""
+    achievements = getattr(game, "achievements", None)
+    if achievements is None:
+        return
+    for name, check in list(vars(achievements).items()):
+        flag = f"{name}_Gotten"
+        if name.startswith("_") or not hasattr(game, flag):
+            continue
+        func = check.__func__ if isinstance(check, staticmethod) else check
+        if not callable(func) or getattr(func, "_tracked", False):
+            continue
+        def make_wrapper(name=name, flag=flag, func=func):
+            def wrapper(*args, **kwargs):
+                was_gotten = getattr(game, flag)
+                result = func(*args, **kwargs)
+                if not was_gotten and getattr(game, flag):
+                    track(f"/achievement/{name}", f"Achievement: {name.replace('_', ' ')}")
+                return result
+            wrapper._tracked = True
+            return wrapper
+        setattr(achievements, name, staticmethod(make_wrapper()))
+
+
 # ---------- Runs ----------
 # Variables that belong to the current run, and are saved at the start of every life
 RUN_VARIABLES = ["lives_lived", "all_there_is", "first_person", "physical_form"]
@@ -405,6 +479,8 @@ def start_of_life(namespace):
     run = getattr(game, "current_run", None)
     if run is None:
         return
+    life = namespace.get("lives_lived", 0) + 1
+    track(f"/life/{life}", f"Started life {life}")
     if run.get("checkpoint") is None and namespace.get("lives_lived", 0) == 0:
         return   # first life of a new run: nothing worth saving yet
     if "replaces" in run:
@@ -421,6 +497,7 @@ def start_of_life(namespace):
 def finish_run():
     """Call when a run reaches its ending, so it's no longer offered to continue."""
     run = getattr(game, "current_run", None)
+    track("/run/finished", "Reached the ending", wait_for_it=True)
     if run is not None:
         run["finished"] = True
         run["last_played"] = now()
@@ -431,6 +508,8 @@ def finish_run():
 def back_to_home_screen():
     """Restart the game, which brings up the home screen. The run was saved
     at the start of this life, so it can be continued from there."""
+    track("/run/left-for-home-screen", "Left a run for the home screen", wait_for_it=True)
+    os.environ["YOU_EXIST_RESTARTED"] = "1"   # so the restart isn't counted as a new launch
     sys.stdout.write("\033[r\033[?25h")
     sys.stdout.flush()
     if getattr(sys, "frozen", False):
@@ -502,6 +581,8 @@ def home_screen(namespace=None):
     builtins.input = input_with_menu
     if namespace is not None:
         namespace["wait"] = wait
+        track_chapters(namespace)
+    track_achievements()
 
     sys.stdout.write("\033[r\033[?25l")   # use the whole window, and hide the cursor
     try:
@@ -524,6 +605,10 @@ def home_screen(namespace=None):
             elif options[picked] == "Play":
                 run = choose_run()
                 if run is not None:
+                    if run.get("checkpoint"):
+                        track("/run/continued", "Continued a run")
+                    else:
+                        track("/run/new", "Started a new run")
                     apply_run(run, namespace)
                     return
     finally:
