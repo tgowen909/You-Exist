@@ -143,7 +143,8 @@ def all_achievements():
 def achievements_screen():
     page = 0
     while True:
-        achievements = all_achievements()
+        # Unlocked achievements first, then locked ones (each group keeps its usual order)
+        achievements = sorted(all_achievements(), key=lambda a: not a[3])
         unlocked = sum(1 for a in achievements if a[3])
         per_page = max(1, (game.size.lines - 9) // 2)   # each achievement takes two lines
         pages = max(1, -(-len(achievements) // per_page))
