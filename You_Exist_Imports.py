@@ -389,6 +389,29 @@ class points: # maybe change it so that if change == 0, then you dont print (cha
 # The folder the game files are in (works in VS Code, in the app, and with the launcher)
 GAME_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
+def die(name, scroll=True):
+    """Every death in the story ends with this. It records which death it was on
+    your GoatCounter dashboard (as /death/<name>), then scrolls the screen away
+    like the old ending_lines code did. Use scroll=False where the screen
+    shouldn't scroll (e.g. just before the game closes the window)."""
+    signal_thread = None
+    try:
+        from Home_Screen import track
+        signal_thread = track(f"/death/{name}", f"Death: {name}")
+    except Exception:
+        pass   # tracking is never allowed to break the game
+    if scroll:
+        ending_lines = (int(size.lines)/2)
+        if ending_lines == 1:
+            print()
+            ending_lines -= 1
+        while ending_lines > 1:
+            print()
+            time.sleep(0.075)
+            ending_lines -= 1
+    elif signal_thread is not None:
+        signal_thread.join(timeout=3)   # give the signal a moment to send before the game closes
+
 def play_sound(filename):
     # Plays a sound from the Audio folder in the background, using the Mac's
     # built-in afplay command (no extra libraries needed). Missing files are skipped.

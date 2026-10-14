@@ -61,14 +61,7 @@ for i, sentence in enumerate(story):
                     wait()
                 else:
                     wait()
-                    ending_lines = (int(size.lines)/2)
-                    if ending_lines == 1:
-                        print()
-                        ending_lines -=1
-                    while ending_lines > 1:
-                        print()
-                        time.sleep(0.075)
-                        ending_lines -= 1
+                    die("Bathe_in_Discourse/run-away")
 
 
         elif choice == "listen": # DONE
@@ -190,14 +183,7 @@ for i, sentence in enumerate(story):
                                         wait()
                                     else:
                                         wait()
-                                        ending_lines = (int(size.lines)/2)
-                                        if ending_lines == 1:
-                                            print()
-                                            ending_lines -=1
-                                        while ending_lines > 1:
-                                            print()
-                                            time.sleep(0.075)
-                                            ending_lines -= 1
+                                        die("Bathe_in_Discourse/take-back")
                                 
 
 
@@ -243,7 +229,10 @@ for i, sentence in enumerate(story):
                                     points.confidence(-1)
                                     points.physicality(-2)
                                     being("Goodbye.")
-                                    os.kill(os.getppid(), signal.SIGHUP) ### MAYBE PRINT YOUR FINAL POINT STATISTICS BEFORE CLOSING THE TAB?
+                                    die("Bathe_in_Discourse/obliteration", scroll=False)
+                                    ### MAYBE PRINT YOUR FINAL POINT STATISTICS BEFORE GOING BACK TO THE MENU?
+                                    from Home_Screen import obliterate
+                                    obliterate()   # this run is over for good: back to the home screen
                                     
                                 elif choice == "repetition": # END
                                     points.ponder(1)
@@ -252,14 +241,7 @@ for i, sentence in enumerate(story):
                                     points.insanity(1)
                                     points.charisma(-1)
                                     being("See you soon.")
-                                    ending_lines = (int(size.lines)/2)
-                                    if ending_lines == 1:
-                                        print()
-                                        ending_lines -=1
-                                    while ending_lines > 1:
-                                        print()
-                                        time.sleep(0.075)
-                                        ending_lines -= 1
+                                    die("Bathe_in_Discourse/repetition")
 
 
 
@@ -350,14 +332,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Bathe_in_Discourse/attract")
 
 
                                                 elif choice == "answer": # END
@@ -388,14 +363,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Bathe_in_Discourse/answer")
                                         
 
 
@@ -424,14 +392,7 @@ for i, sentence in enumerate(story):
                                                 wait()
                                             else:
                                                 wait()
-                                                ending_lines = (int(size.lines)/2)
-                                                if ending_lines == 1:
-                                                    print()
-                                                    ending_lines -=1
-                                                while ending_lines > 1:
-                                                    print()
-                                                    time.sleep(0.075)
-                                                    ending_lines -= 1
+                                                die("Bathe_in_Discourse/ping")
 
 
 
@@ -496,14 +457,7 @@ for i, sentence in enumerate(story):
                             being("Not remembering anything.")
                             being("And I think you and I know where this is going.")
                             being("It can't be *that* hard only knowing that...")
-                            ending_lines = (int(size.lines)/2)
-                            if ending_lines == 1:
-                                print()
-                                ending_lines -=1
-                            while ending_lines > 1:
-                                print()
-                                time.sleep(0.075)
-                                ending_lines -= 1
+                            die("Bathe_in_Discourse/heal")
 
 
 
@@ -534,14 +488,7 @@ for i, sentence in enumerate(story):
                             being("Not remembering anything.")
                             being("And I think you and I know where this is going.")
                             being("It can't be *that* hard only knowing that...")
-                            ending_lines = (int(size.lines)/2)
-                            if ending_lines == 1:
-                                print()
-                                ending_lines -=1
-                            while ending_lines > 1:
-                                print()
-                                time.sleep(0.075)
-                                ending_lines -= 1
+                            die("Bathe_in_Discourse/dispose")
 
                             
 

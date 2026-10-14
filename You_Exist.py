@@ -138,14 +138,7 @@ while True:
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("You_Exist/ignore")
                                                             
                                                 elif choice == "pursue": # FILE
                                                     points.ponder(1) 
@@ -169,16 +162,8 @@ while True:
                                     wait()
                                 else:
                                     wait()
-                                    ending_lines = (int(size.lines)/2)
                                     achievements.Quick_Death()
-                                    if ending_lines == 1:
-                                        print()
-                                        os.system('clear')
-                                        ending_lines -=1
-                                    while ending_lines > 1:
-                                        print()
-                                        time.sleep(0.075)
-                                        ending_lines -= 1
+                                    die("You_Exist/speck")
                                     
 
 
@@ -397,14 +382,7 @@ while True:
                                                     wait()
                                                 else:
                                                     wait()
-                                                    ending_lines = (int(size.lines)/2)
-                                                    if ending_lines == 1:
-                                                        print()
-                                                        ending_lines -=1
-                                                    while ending_lines > 1:
-                                                        print()
-                                                        time.sleep(0.075)
-                                                        ending_lines -= 1
+                                                    die("You_Exist/normal")
                                             
                                         elif choice == "possess": # FILE
                                             points.ponder(1)
@@ -468,14 +446,7 @@ while True:
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("You_Exist/interact")
                                                 
                                             elif choice == "move on": # END
                                                 story = ["...", "Surprise!", "It's me again.", "Ah...", "I need to keep reminding myself you can't remember anything.", "I've been doing this for who knows how long, and I still make that mistake.", 
@@ -488,14 +459,7 @@ while True:
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("You_Exist/move-on")
 
 
                                 elif choice == "evil": # DONE
@@ -530,14 +494,7 @@ while True:
                                             else:
                                                 print()
                                                 wait()
-                                                ending_lines = (int(size.lines)/2)
-                                                if ending_lines == 1:
-                                                    print()
-                                                    ending_lines -=1
-                                                while ending_lines > 1:
-                                                    print()
-                                                    time.sleep(0.075)
-                                                    ending_lines -= 1
+                                                die("You_Exist/proud")
                                         
                                     elif choice == "regret": # DONE
                                         points.ponder(1)
@@ -572,14 +529,7 @@ while True:
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("You_Exist/owe-them")
                                                     
                                                 elif choice == "your heart": # FILE
                                                     points.physicality(1)
@@ -629,14 +579,7 @@ while True:
                                                 else:
                                                     print()
                                                     wait()
-                                                    ending_lines = (int(size.lines)/2)
-                                                    if ending_lines == 1:
-                                                        print()
-                                                        ending_lines -=1
-                                                    while ending_lines > 1:
-                                                        print()
-                                                        time.sleep(0.075)
-                                                        ending_lines -= 1
+                                                    die("You_Exist/ignorant")
 
 
 

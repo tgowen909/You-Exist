@@ -245,8 +245,8 @@ def achievements_screen():
 
 
 # ---------- Path tracking (GoatCounter) ----------
-# Sends a small signal to your GoatCounter dashboard when players reach chapters,
-# lives, achievements and endings, so you can see which paths people take.
+# Sends a small signal to your GoatCounter dashboard when players start lives,
+# unlock achievements, die (see die() in You_Exist_Imports.py) and reach the ending.
 # Uses the LAUNCH_COUNTER address from You_Exist_Imports.py. Like the launch
 # counter, it does nothing in VS Code and silently gives up without internet.
 import threading
@@ -279,20 +279,7 @@ def track(path, title=None, wait_for_it=False):
     thread.start()
     if wait_for_it:
         thread.join(timeout=3)   # for signals sent just before the game restarts
-
-def track_chapters(namespace):
-    """Every chapter file is opened through resource_path(), so wrapping it
-    records each chapter a player reaches, without touching the chapter files."""
-    original = namespace.get("resource_path")
-    if original is None or getattr(original, "_tracked", False):
-        return
-    def resource_path(name):
-        if name.endswith(".py"):
-            chapter = name[:-3]
-            track(f"/chapter/{chapter}", f"Chapter: {chapter.replace('_', ' ')}")
-        return original(name)
-    resource_path._tracked = True
-    namespace["resource_path"] = resource_path
+    return thread
 
 def track_achievements():
     """Records each achievement the moment a player unlocks it."""
@@ -505,10 +492,11 @@ def finish_run():
 
 
 # ---------- Getting back to the home screen ----------
-def back_to_home_screen():
+def back_to_home_screen(track_leaving=True):
     """Restart the game, which brings up the home screen. The run was saved
     at the start of this life, so it can be continued from there."""
-    track("/run/left-for-home-screen", "Left a run for the home screen", wait_for_it=True)
+    if track_leaving:
+        track("/run/left-for-home-screen", "Left a run for the home screen", wait_for_it=True)
     os.environ["YOU_EXIST_RESTARTED"] = "1"   # so the restart isn't counted as a new launch
     sys.stdout.write("\033[r\033[?25h")
     sys.stdout.flush()
@@ -516,6 +504,17 @@ def back_to_home_screen():
         os.execv(sys.executable, [sys.executable])                  # the built app
     else:
         os.execv(sys.executable, [sys.executable] + sys.argv)       # running in VS Code
+
+def obliterate():
+    """For deaths that end a run for good: the run can no longer be continued,
+    and the game goes straight back to the home screen."""
+    run = getattr(game, "current_run", None)
+    if run is not None:
+        run["finished"] = True
+        run["last_played"] = now()
+        save_progress()
+    time.sleep(1)   # a brief, empty pause before the home screen appears
+    back_to_home_screen(track_leaving=False)
 
 def ask_to_leave():
     """Shows a one-line question. Returns True if the player wants to go home.
@@ -581,7 +580,6 @@ def home_screen(namespace=None):
     builtins.input = input_with_menu
     if namespace is not None:
         namespace["wait"] = wait
-        track_chapters(namespace)
     track_achievements()
 
     sys.stdout.write("\033[r\033[?25l")   # use the whole window, and hide the cursor

@@ -125,14 +125,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/yes")
                                         
                                             elif choice == "no": ### END
                                                 points.confidence(-1)
@@ -153,14 +146,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/no")
                                                 
                                 elif choice == "miss": ### DONE
                                     points.confidence(-1)
@@ -198,14 +184,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/will")
 
                                             elif choice == "wont": ### END
                                                 points.charisma(-1)
@@ -219,6 +198,13 @@ for i, sentence in enumerate(story):
                                                          "You tried, I suppose, but that's not something you can win against.","Not now, at least.","And likely not ever, unless you actually get somewhere.",
                                                          "But what would be the fun it that?","That's not why you're here.","Well, back to the drawing board for you. Time to start over.",
                                                          "And the only thing on this clean slate of yours will be..."]
+                                                for i, sentence in enumerate(story):
+                                                    cprint(sentence, "red", attrs=["bold", "dark"])
+                                                    if i < len(story) - 1:
+                                                        wait()
+                                                    else:
+                                                        wait()
+                                                        die("Developing_Touch/wont")
 
                     elif choice == "run away": ### DONE
                         points.ponder(1)
@@ -256,14 +242,7 @@ for i, sentence in enumerate(story):
                                             wait()
                                         else:
                                             wait()
-                                            ending_lines = (int(size.lines)/2)
-                                            if ending_lines == 1:
-                                                print()
-                                                ending_lines -=1
-                                            while ending_lines > 1:
-                                                print()
-                                                time.sleep(0.075)
-                                                ending_lines -= 1
+                                            die("Developing_Touch/futile")
 
                                 elif choice == "successful": ### END
                                     points.confidence(1)
@@ -280,14 +259,7 @@ for i, sentence in enumerate(story):
                                             wait()
                                         else:
                                             wait()
-                                            ending_lines = (int(size.lines)/2)
-                                            if ending_lines == 1:
-                                                print()
-                                                ending_lines -=1
-                                            while ending_lines > 1:
-                                                print()
-                                                time.sleep(0.075)
-                                                ending_lines -= 1
+                                            die("Developing_Touch/successful")
                                     
         elif choice == "embrace": # DONE
             points.charisma(1)
@@ -353,14 +325,7 @@ for i, sentence in enumerate(story):
                                             wait()
                                         else:
                                             wait()
-                                            ending_lines = (int(size.lines)/2)
-                                            if ending_lines == 1:
-                                                print()
-                                                ending_lines -=1
-                                            while ending_lines > 1:
-                                                print()
-                                                time.sleep(0.075)
-                                                ending_lines -= 1
+                                            die("Developing_Touch/left")
 
                                 elif choice == "right":
                                     points.ponder(1)
@@ -404,14 +369,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/turn-around")
 
 
                                             elif choice == "through":
@@ -458,14 +416,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Developing_Touch/through/secret-room")
 
                                                 else: # END
                                                     story = ["After much searching and feeling around the wall, you stumble across an outcropping that you believe could support you.",
@@ -493,14 +444,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Developing_Touch/through/climb")
 
                                                 
                     elif choice == "existences":
@@ -597,14 +541,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/fights-back/destruction")
 
                                             elif choice == "quit": # END
                                                 points.morality(1)
@@ -618,14 +555,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/fights-back/quit")
 
                                 elif confidence < 4 and charisma > -1: # it runs away
                                     story = ["Before you connect, it dashes away in a desperate attempt for survival.",
@@ -675,14 +605,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/runs-away/destruction")
 
                                             elif choice == "quit": # END
                                                 points.morality(1)
@@ -696,14 +619,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Developing_Touch/runs-away/quit")
 
                                 elif confidence < 4 and charisma < 0: # it gives up
                                     story = ["It doesn't move as your strengthened body connects with a thud, the power from your hit reverberating up your limb.",
@@ -780,14 +696,7 @@ for i, sentence in enumerate(story):
                                                                 wait()
                                                             else:
                                                                 wait()
-                                                                ending_lines = (int(size.lines)/2)
-                                                                if ending_lines == 1:
-                                                                    print()
-                                                                    ending_lines -=1
-                                                                while ending_lines > 1:
-                                                                    print()
-                                                                    time.sleep(0.075)
-                                                                    ending_lines -= 1
+                                                                die("Developing_Touch/gives-up/destruction")
 
                                                     elif choice == "quit": # END
                                                         points.morality(1)
@@ -801,11 +710,4 @@ for i, sentence in enumerate(story):
                                                                 wait()
                                                             else:
                                                                 wait()
-                                                                ending_lines = (int(size.lines)/2)
-                                                                if ending_lines == 1:
-                                                                    print()
-                                                                    ending_lines -=1
-                                                                while ending_lines > 1:
-                                                                    print()
-                                                                    time.sleep(0.075)
-                                                                    ending_lines -= 1
+                                                                die("Developing_Touch/gives-up/quit")

@@ -273,14 +273,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Hear_the_Voices/vent/looped")
                                                     looped = False
                                                     break
 
@@ -297,14 +290,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Hear_the_Voices/vent/no-loop")
                                                     looped = False
                                                     break
 
@@ -494,14 +480,7 @@ for i, sentence in enumerate(story):
                                             wait()
                                         else:
                                             wait()
-                                            ending_lines = (int(size.lines)/2)
-                                            if ending_lines == 1:
-                                                print()
-                                                ending_lines -=1
-                                            while ending_lines > 1:
-                                                print()
-                                                time.sleep(0.075)
-                                                ending_lines -= 1
+                                            die("Hear_the_Voices/wave/interact")
                                     
 
                                 elif choice == "serenaded": # DONE
@@ -610,14 +589,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Hear_the_Voices/wave/dispose")
 
 
                                                     
@@ -692,14 +664,7 @@ for i, sentence in enumerate(story):
                                                             wait()
                                                         else:
                                                             wait()
-                                                            ending_lines = (int(size.lines)/2)
-                                                            if ending_lines == 1:
-                                                                print()
-                                                                ending_lines -=1
-                                                            while ending_lines > 1:
-                                                                print()
-                                                                time.sleep(0.075)
-                                                                ending_lines -= 1
+                                                            die("Hear_the_Voices/wave/stay")
 
                                                     
                                             elif choice == "no": # END
@@ -727,14 +692,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("Hear_the_Voices/wave/no")
 
 
         elif choice == "shut up": # DONE
@@ -776,14 +734,7 @@ for i, sentence in enumerate(story):
                                 wait()
                             else:
                                 wait()
-                                ending_lines = (int(size.lines)/2)
-                                if ending_lines == 1:
-                                    print()
-                                    ending_lines -=1
-                                while ending_lines > 1:
-                                    print()
-                                    time.sleep(0.075)
-                                    ending_lines -= 1
+                                die("Hear_the_Voices/shut-up/interact")
                         
 
                     elif choice == "serenaded": # DONE
@@ -892,14 +843,7 @@ for i, sentence in enumerate(story):
                                                 wait()
                                             else:
                                                 wait()
-                                                ending_lines = (int(size.lines)/2)
-                                                if ending_lines == 1:
-                                                    print()
-                                                    ending_lines -=1
-                                                while ending_lines > 1:
-                                                    print()
-                                                    time.sleep(0.075)
-                                                    ending_lines -= 1
+                                                die("Hear_the_Voices/shut-up/dispose")
 
  
                                     elif choice == "stay": # END (with LOOP)
@@ -973,14 +917,7 @@ for i, sentence in enumerate(story):
                                                 wait()
                                             else:
                                                 wait()
-                                                ending_lines = (int(size.lines)/2)
-                                                if ending_lines == 1:
-                                                    print()
-                                                    ending_lines -=1
-                                                while ending_lines > 1:
-                                                    print()
-                                                    time.sleep(0.075)
-                                                    ending_lines -= 1
+                                                die("Hear_the_Voices/shut-up/stay")
 
                                         
                                 elif choice == "no": # END
@@ -1008,14 +945,7 @@ for i, sentence in enumerate(story):
                                             wait()
                                         else:
                                             wait()
-                                            ending_lines = (int(size.lines)/2)
-                                            if ending_lines == 1:
-                                                print()
-                                                ending_lines -=1
-                                            while ending_lines > 1:
-                                                print()
-                                                time.sleep(0.075)
-                                                ending_lines -= 1
+                                            die("Hear_the_Voices/shut-up/no")
 
 
 

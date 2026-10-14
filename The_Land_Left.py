@@ -46,14 +46,7 @@ for i, sentence in enumerate(story):
                     wait()
                 else:
                     wait()
-                    ending_lines = (int(size.lines)/2)
-                    if ending_lines == 1:
-                        print()
-                        ending_lines -=1
-                    while ending_lines > 1:
-                        print()
-                        time.sleep(0.075)
-                        ending_lines -= 1
+                    die("The_Land_Left/give-up")
 
         elif choice == "resilience":
             points.charisma(1)
@@ -113,14 +106,7 @@ for i, sentence in enumerate(story):
                                         wait()
                                     else:
                                         wait()
-                                        ending_lines = (int(size.lines)/2)
-                                        if ending_lines == 1:
-                                            print()
-                                            ending_lines -=1
-                                        while ending_lines > 1:
-                                            print()
-                                            time.sleep(0.075)
-                                            ending_lines -= 1
+                                        die("The_Land_Left/commit")
 
                                                 
                     elif choice == "inspect":
@@ -194,14 +180,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("The_Land_Left/continue-exploring")
 
                                             elif choice == "consider":
                                                 points.charisma(-1)
@@ -310,14 +289,7 @@ for i, sentence in enumerate(story):
                                                                                 wait()
                                                                             else:
                                                                                 wait()
-                                                                                ending_lines = (int(size.lines)/2)
-                                                                                if ending_lines == 1:
-                                                                                    print()
-                                                                                    ending_lines -=1
-                                                                                while ending_lines > 1:
-                                                                                    print()
-                                                                                    time.sleep(0.075)
-                                                                                    ending_lines -= 1
+                                                                                die("The_Land_Left/protect/escape")
                                                                         
                                                                     elif choice == "stay": # END
                                                                         points.morality(1)
@@ -353,14 +325,7 @@ for i, sentence in enumerate(story):
                                                                                 wait()
                                                                             else:
                                                                                 wait()
-                                                                                ending_lines = (int(size.lines)/2)
-                                                                                if ending_lines == 1:
-                                                                                    print()
-                                                                                    ending_lines -=1
-                                                                                while ending_lines > 1:
-                                                                                    print()
-                                                                                    time.sleep(0.075)
-                                                                                    ending_lines -= 1
+                                                                                die("The_Land_Left/protect/stay")
 
 
                                                         elif choice == "destroy": # DONE
@@ -441,14 +406,7 @@ for i, sentence in enumerate(story):
                                                                                             wait()
                                                                                         else:
                                                                                             wait()
-                                                                                            ending_lines = (int(size.lines)/2)
-                                                                                            if ending_lines == 1:
-                                                                                                print()
-                                                                                                ending_lines -=1
-                                                                                            while ending_lines > 1:
-                                                                                                print()
-                                                                                                time.sleep(0.075)
-                                                                                                ending_lines -= 1
+                                                                                            die("The_Land_Left/fight")
                                                                                     
                                                                                 elif choice == "accept": # END
                                                                                     points.charisma(-1)
@@ -471,14 +429,7 @@ for i, sentence in enumerate(story):
                                                                                             wait()
                                                                                         else:
                                                                                             wait()
-                                                                                            ending_lines = (int(size.lines)/2)
-                                                                                            if ending_lines == 1:
-                                                                                                print()
-                                                                                                ending_lines -=1
-                                                                                            while ending_lines > 1:
-                                                                                                print()
-                                                                                                time.sleep(0.075)
-                                                                                                ending_lines -= 1
+                                                                                            die("The_Land_Left/accept")
 
 
                                                                     elif choice == "escape": # END
@@ -502,14 +453,7 @@ for i, sentence in enumerate(story):
                                                                                 wait()
                                                                             else:
                                                                                 wait()
-                                                                                ending_lines = (int(size.lines)/2)
-                                                                                if ending_lines == 1:
-                                                                                    print()
-                                                                                    ending_lines -=1
-                                                                                while ending_lines > 1:
-                                                                                    print()
-                                                                                    time.sleep(0.075)
-                                                                                    ending_lines -= 1
+                                                                                die("The_Land_Left/destroy/escape")
 
 
                                 elif choice == "become it": # DONE
@@ -578,14 +522,7 @@ for i, sentence in enumerate(story):
                                                         wait()
                                                     else:
                                                         wait()
-                                                        ending_lines = (int(size.lines)/2)
-                                                        if ending_lines == 1:
-                                                            print()
-                                                            ending_lines -=1
-                                                        while ending_lines > 1:
-                                                            print()
-                                                            time.sleep(0.075)
-                                                            ending_lines -= 1
+                                                        die("The_Land_Left/explore")
                                                 
 
                                             elif choice == "continue": # DONE
@@ -629,14 +566,7 @@ for i, sentence in enumerate(story):
                                                                     wait()
                                                                 else:
                                                                     wait()
-                                                                    ending_lines = (int(size.lines)/2)
-                                                                    if ending_lines == 1:
-                                                                        print()
-                                                                        ending_lines -=1
-                                                                    while ending_lines > 1:
-                                                                        print()
-                                                                        time.sleep(0.075)
-                                                                        ending_lines -= 1
+                                                                    die("The_Land_Left/beneficial")
                                                             
 
 
@@ -690,14 +620,7 @@ for i, sentence in enumerate(story):
                                                                                 wait()
                                                                             else:
                                                                                 wait()
-                                                                                ending_lines = (int(size.lines)/2)
-                                                                                if ending_lines == 1:
-                                                                                    print()
-                                                                                    ending_lines -=1
-                                                                                while ending_lines > 1:
-                                                                                    print()
-                                                                                    time.sleep(0.075)
-                                                                                    ending_lines -= 1
+                                                                                die("The_Land_Left/detrimental/escape")
 
 
 
@@ -728,14 +651,7 @@ for i, sentence in enumerate(story):
                                                                                 wait()
                                                                             else:
                                                                                 wait()
-                                                                                ending_lines = (int(size.lines)/2)
-                                                                                if ending_lines == 1:
-                                                                                    print()
-                                                                                    ending_lines -=1
-                                                                                while ending_lines > 1:
-                                                                                    print()
-                                                                                    time.sleep(0.075)
-                                                                                    ending_lines -= 1
+                                                                                die("The_Land_Left/detrimental/stay")
 
 
                                                                         
