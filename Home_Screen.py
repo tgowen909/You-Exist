@@ -424,7 +424,7 @@ def back_to_home_screen():
 
 def ask_to_leave():
     """Shows a one-line question. Returns True if the player wants to go home."""
-    question = "Return to the home screen? You'll continue from the start of this life.  (Enter: yes, any other key: no)"
+    question = "Return to the home screen? You'll continue from the start of this life.  (Enter/Space: Yes. Any other key: No)"
     question = fit(question, game.size.columns - 1)
     sys.stdout.write("\r\033[2K")
     sys.stdout.write(colour(DIM_COLOUR, question))
