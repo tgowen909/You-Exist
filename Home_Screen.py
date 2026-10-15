@@ -459,6 +459,166 @@ def apply_run(run, namespace):
         if namespace is not None:
             namespace[name] = value
 
+# ---------- Statistics ----------
+# Lifetime totals across every run. Points are counted as the CHANGE over each
+# finished life (so reaching life 4 with 10 Ponder doesn't add 10 again).
+
+def stats():
+    store = _run_store()
+    st = store.setdefault("stats", {})
+    points = st.setdefault("points", {})
+    for name in POINTS:
+        points.setdefault(name, 0)
+    for key in ("lives_completed", "deaths", "runs_completed"):
+        st.setdefault(key, 0)
+    st.setdefault("deaths_found", [])
+    return st
+
+def points_now():
+    return {name: getattr(game, name, 0) for name in POINTS}
+
+def count_finished_life(run):
+    """Add the points gained or lost during the life that just ended to the lifetime totals."""
+    started = run.get("life_start")
+    if not started:
+        return
+    st = stats()
+    current = points_now()
+    for name in POINTS:
+        st["points"][name] += current[name] - started["points"].get(name, 0)
+    st["lives_completed"] += 1
+    run["life_start"] = None   # so the same life can never be counted twice
+
+def record_death(name):
+    st = stats()
+    st["deaths"] += 1
+    if name not in st["deaths_found"]:
+        st["deaths_found"].append(name)
+    save_route(name)
+    save_progress()
+
+# ---------- Routes (for the discovery tree) ----------
+# During each life, every choice the player makes is remembered. When the life
+# ends (in a death, or the ending), that route is saved with how it ended.
+# A typed answer only counts as a choice if it matches one of the options shown
+# in brackets, like (fret) or (accept), or is yes/no to a question with no
+# bracketed options, so rejected answers aren't recorded.
+current_route = []
+_recent_text = []
+
+def _clean(text):
+    for symbol in "'().,":
+        text = text.replace(symbol, "")
+    return text.lower().strip()
+
+def _remember_printed(text):
+    _recent_text.append(text)
+    if len(_recent_text) > 400:
+        del _recent_text[:200]
+
+def note_answer(answer):
+    """Called with everything the player types. Records it if it's one of the offered options."""
+    shown = "".join(_recent_text)
+    _recent_text.clear()
+    options = {_clean(o) for o in re.findall(r"\(([^()\n]{1,40})\)", shown) if re.search(r"[A-Za-z]", o)}
+    choice = _clean(answer)
+    if choice and choice in options:
+        pass
+    elif not options and choice in ("yes", "no"):
+        options = {"yes", "no"}          # yes/no questions don't show their options in brackets
+    else:
+        return                           # not one of the offered options: the game will ask again
+    # Remember the question asked at this point, for the discovery tree
+    plain = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b[78]", "", shown)
+    lines = [line.strip() for line in plain.splitlines() if line.strip()]
+    questions = stats().setdefault("questions", {})
+    questions[">".join(current_route)] = {"question": lines[-1] if lines else "", "options": sorted(options)}
+    current_route.append(choice)
+
+def save_route(ending):
+    if not current_route and ending is None:
+        return
+    routes = stats().setdefault("routes", [])
+    for route in routes:
+        if route["choices"] == current_route and route["end"] == ending:
+            route["times"] += 1
+            break
+    else:
+        routes.append({"choices": list(current_route), "end": ending, "times": 1})
+    current_route.clear()
+
+def install_route_recording():
+    out = sys.stdout
+    if getattr(out, "_route_tap", False):
+        return
+    original_write = out.write
+    def write(text):
+        _remember_printed(text)
+        return original_write(text)
+    try:
+        out.write = write
+        out._route_tap = True
+    except AttributeError:
+        pass   # can't tap this output (very unlikely): routes just won't be recorded
+
+
+def all_deaths():
+    """Every death in the game, found by reading the die("...") lines in the story files."""
+    folder = os.path.dirname(os.path.abspath(game.__file__))
+    names = set()
+    for file in os.listdir(folder):
+        if file.endswith(".py") and file not in ("Home_Screen.py", "You_Exist_Imports.py", "launcher.py"):
+            try:
+                with open(os.path.join(folder, file), encoding="utf-8") as f:
+                    names.update(re.findall(r'\bdie\("([^"]+)"', f.read()))
+            except OSError:
+                pass
+    return names
+
+def statistics_screen():
+    st = stats()
+    known = all_deaths()
+    found = len([d for d in st["deaths_found"] if d in known]) if known else len(st["deaths_found"])
+    rows = [("Lives lived", str(st["lives_completed"])),
+            ("Deaths", str(st["deaths"])),
+            ("Deaths discovered", f"{found} of {len(known)}" if known else str(found)),
+            ("Runs completed", str(st["runs_completed"]))]
+    point_rows = [(name.capitalize(), f"{st['points'][name]:+d}" if st["points"][name] else "0") for name in POINTS]
+    width = max(len(label) for label, _ in rows + point_rows) + 10
+    options = ["Discoveries", "Back"]
+    selected = 0
+    while True:
+        clear()
+        draw_title()
+        heading = "Statistics across all your runs"
+        print(centred(colour(UNLOCKED_COLOUR, heading, bold=True), len(heading)))
+        print()
+        for label, value in rows:
+            line = label + value.rjust(width - len(label))
+            print(centred(colour(UNLOCKED_COLOUR, line), len(line)))
+        print()
+        sub = "Points gained or lost over all your lives"
+        print(centred(colour(DIM_COLOUR, sub), len(sub)))
+        for label, value in point_rows:
+            line = label + value.rjust(width - len(label))
+            print(centred(colour(UNLOCKED_COLOUR, line), len(line)))
+        print()
+        for index, option in enumerate(options):
+            text = ("›  " if index == selected else "   ") + option
+            print(centred(colour(HIGHLIGHT_COLOUR, text, bold=True) if index == selected else colour(DIM_COLOUR, text), len(text)))
+        print()
+        hint = "↑ ↓ to move, Enter to select"
+        print(centred(colour(DIM_COLOUR, hint), len(hint)))
+        sys.stdout.flush()
+        key = read_key()
+        if key in ("up", "down"):
+            selected = 1 - selected
+        elif key == "back" or (key == "enter" and options[selected] == "Back"):
+            return
+        elif key == "enter" and options[selected] == "Discoveries":
+            discoveries_screen()
+
+
 def start_of_life(namespace):
     """Call at the start of each life: saves the run so it can be continued from here.
     A brand new run isn't saved until its first life is over, since continuing it
@@ -468,6 +628,12 @@ def start_of_life(namespace):
         return
     life = namespace.get("lives_lived", 0) + 1
     track(f"/life/{life}", f"Started life {life}")
+    lives = namespace.get("lives_lived", 0)
+    started = run.get("life_start")
+    if started and lives > started.get("life", lives):
+        count_finished_life(run)          # the previous life is over: add its point changes
+    run["life_start"] = {"life": lives, "points": points_now()}
+    current_route.clear()
     if run.get("checkpoint") is None and namespace.get("lives_lived", 0) == 0:
         return   # first life of a new run: nothing worth saving yet
     if "replaces" in run:
@@ -486,6 +652,9 @@ def finish_run():
     run = getattr(game, "current_run", None)
     track("/run/finished", "Reached the ending", wait_for_it=True)
     if run is not None:
+        count_finished_life(run)
+        stats()["runs_completed"] += 1
+        save_route("THE ENDING")
         run["finished"] = True
         run["last_played"] = now()
         save_progress()
@@ -510,6 +679,7 @@ def obliterate():
     and the game goes straight back to the home screen."""
     run = getattr(game, "current_run", None)
     if run is not None:
+        count_finished_life(run)
         run["finished"] = True
         run["last_played"] = now()
         save_progress()
@@ -563,9 +733,210 @@ def input_with_menu(prompt=""):
     while True:
         answer = _original_input(prompt)
         if answer.strip().lower() != "menu":
+            note_answer(answer)
             return answer
         if ask_to_leave():
             back_to_home_screen()
+
+
+# ---------- Discoveries ----------
+# An overview of every chapter, with a dot for each of its deaths (filled in once
+# found), leading into an explorer that walks through the routes the player has
+# taken, one decision at a time.
+FOUND_COLOUR = TITLE_COLOUR    # discovered deaths use the being's red
+
+def chapters_in_order():
+    """Chapter names in the order they appear in the story, each with its deaths in order."""
+    folder = os.path.dirname(os.path.abspath(game.__file__))
+    order = ["You_Exist"]
+    try:
+        with open(os.path.join(folder, "You_Exist.py"), encoding="utf-8") as f:
+            for name in re.findall(r'resource_path\("([^"]+)\.py"\)', f.read()):
+                if name not in order:
+                    order.append(name)
+    except OSError:
+        pass
+    deaths = {}
+    for chapter in order + sorted(f[:-3] for f in os.listdir(folder) if f.endswith(".py")):
+        if chapter in deaths or chapter in ("Home_Screen", "You_Exist_Imports", "launcher"):
+            continue
+        try:
+            with open(os.path.join(folder, chapter + ".py"), encoding="utf-8") as f:
+                found = re.findall(r'\bdie\("([^"]+)"', f.read())
+        except OSError:
+            continue
+        if found:
+            deaths[chapter] = list(dict.fromkeys(found))   # keep order, drop repeats
+    return deaths
+
+def pretty(name):
+    return name.replace("_", " ")
+
+def death_label(death):
+    # "The_Land_Left/protect/escape" -> "protect / escape"
+    return " / ".join(death.split("/")[1:]) or death
+
+def discoveries_screen():
+    selected = 0
+    while True:
+        deaths = chapters_in_order()
+        found = set(stats()["deaths_found"])
+        chapters = list(deaths)
+        name_width = max([len(pretty(c)) for c in chapters] + [10])
+        items = []
+        for chapter in chapters:
+            got = sum(1 for d in deaths[chapter] if d in found)
+            dots = " ".join(colour(FOUND_COLOUR, "●") if d in found else colour(DIM_COLOUR, "○") for d in deaths[chapter])
+            dots_width = len(deaths[chapter]) * 2 - 1
+            count = f"{got} of {len(deaths[chapter])}"
+            items.append((chapter, pretty(chapter), dots, dots_width, count))
+        options = [i[1] for i in items] + ["Explore every route", "Back"]
+        total_found = sum(1 for c in chapters for d in deaths[c] if d in found)
+        total = sum(len(deaths[c]) for c in chapters)
+
+        clear()
+        draw_title()
+        heading = f"Discoveries: {total_found} of {total} deaths found"
+        print(centred(colour(UNLOCKED_COLOUR, heading, bold=True), len(heading)))
+        print()
+        widest = max(i[3] for i in items) if items else 0
+        count_width = max([len(i[4]) for i in items] + [0])
+        show_dots = name_width + widest + 16 <= game.size.columns
+        for index, (chapter, name, dots, dots_width, count) in enumerate(items):
+            marker = "›  " if index == selected else "   "
+            style = (lambda t: colour(HIGHLIGHT_COLOUR, t, bold=True)) if index == selected else (lambda t: colour(UNLOCKED_COLOUR, t))
+            line = style(marker + name.ljust(name_width)) + "   "
+            length = 3 + name_width + 3
+            if show_dots:
+                line += dots + " " * (widest - dots_width) + "   "
+                length += widest + 3
+            line += colour(DIM_COLOUR, count.rjust(count_width))
+            length += count_width
+            print(centred(line, length))
+        print()
+        for offset, extra in enumerate(options[len(items):]):
+            index = len(items) + offset
+            text = f"›  {extra}" if index == selected else f"   {extra}"
+            print(centred(colour(HIGHLIGHT_COLOUR, text, bold=True) if index == selected else colour(DIM_COLOUR, text), len(text)))
+        print()
+        hint = "↑ ↓ to move, Enter to explore a chapter's routes"
+        print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
+        sys.stdout.flush()
+
+        key = read_key()
+        if key == "up":
+            selected = (selected - 1) % len(options)
+        elif key == "down":
+            selected = (selected + 1) % len(options)
+        elif key == "back" or (key == "enter" and options[selected] == "Back"):
+            return
+        elif key == "enter":
+            chapter = None if selected >= len(items) else items[selected][0]
+            explore_routes(chapter)
+
+def build_tree(chapter=None):
+    """Turn the saved routes into a tree. Each node is a dict:
+    {"children": {choice: node}, "ends": {death: times}}. If a chapter is given,
+    only routes that ended in that chapter are included."""
+    root = {"children": {}, "ends": {}}
+    for route in stats().get("routes", []):
+        end = route.get("end") or ""
+        if chapter and not end.startswith(chapter + "/"):
+            continue
+        node = root
+        for choice in route["choices"]:
+            node = node["children"].setdefault(choice, {"children": {}, "ends": {}})
+        node["ends"][end] = node["ends"].get(end, 0) + route.get("times", 1)
+    return root
+
+def deaths_below(node):
+    found = set(d for d in node["ends"] if d != "THE ENDING")
+    for child in node["children"].values():
+        found |= deaths_below(child)
+    return found
+
+def explore_routes(chapter=None):
+    tree = build_tree(chapter)
+    path = []               # the choices taken to reach the current point
+    selected = 0
+    questions = stats().get("questions", {})
+    while True:
+        node = tree
+        for choice in path:
+            node = node["children"][choice]
+        info = questions.get(">".join(path), {})
+        # Discovered choices from here, then untried options shown as ???
+        rows = []
+        for choice, child in node["children"].items():
+            below = deaths_below(child)
+            if child["children"]:
+                note = f"{len(below)} death{'s' if len(below) != 1 else ''} found beyond here" if below else "explored"
+                rows.append((choice, note, True))
+            else:
+                ends = [death_label(d) if d != "THE ENDING" else "the ending" for d in child["ends"]]
+                rows.append((choice, "✝ " + ", ".join(ends) if ends else "", False))
+        if not chapter:
+            for option in info.get("options", []):
+                if option not in node["children"]:
+                    rows.append(("???", "not yet explored", False))
+        options = [r[0] for r in rows] + ["Back"]
+        selected = min(selected, len(options) - 1)
+
+        clear()
+        draw_title()
+        crumbs = " › ".join(["you exist"] + path)
+        if chapter:
+            crumbs = pretty(chapter) + ":  " + crumbs
+        if len(crumbs) > game.size.columns - 4:
+            crumbs = "… " + crumbs[-(game.size.columns - 6):]
+        print(centred(colour(DIM_COLOUR, crumbs), len(crumbs)))
+        print()
+        question = info.get("question", "")
+        if question:
+            q = fit(question, game.size.columns - 4)
+            print(centred(colour(UNLOCKED_COLOUR, q), len(q)))
+            print()
+        if not rows:
+            message = "No routes discovered yet." if not path else "Nothing more found down this path yet."
+            print(centred(colour(DIM_COLOUR, message), len(message)))
+            print()
+        width = max([len(r[0]) for r in rows] + [4]) + 4
+        note_room = max(10, game.size.columns - width - 9)
+        block = 3 + width + max([len(fit(r[1], note_room)) for r in rows] + [0])
+        margin = " " * max(0, (game.size.columns - block) // 2)    # line the rows up with each other
+        for index, (label, note, can_enter) in enumerate(rows):
+            chosen = index == selected
+            text = ("›  " if chosen else "   ") + label.ljust(width)
+            body = colour(HIGHLIGHT_COLOUR, text, bold=True) if chosen else colour(UNLOCKED_COLOUR if label != "???" else DIM_COLOUR, text)
+            note_colour = FOUND_COLOUR if note.startswith("✝") else DIM_COLOUR
+            print(margin + body + colour(note_colour, fit(note, note_room)))
+        print()
+        back = "›  Back" if selected == len(rows) else "   Back"
+        print(centred(colour(HIGHLIGHT_COLOUR, back, bold=True) if selected == len(rows) else colour(DIM_COLOUR, back), len(back)))
+        print()
+        hint = "Enter to follow a choice, Esc to step back"
+        print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
+        sys.stdout.flush()
+
+        key = read_key()
+        if key == "up":
+            selected = (selected - 1) % len(options)
+        elif key == "down":
+            selected = (selected + 1) % len(options)
+        elif key in ("back", "left") or (key == "enter" and selected == len(rows)):
+            if not path:
+                return
+            last = path.pop()
+            selected = list(node_at(tree, path)["children"]).index(last)
+        elif key in ("enter", "right") and selected < len(rows) and rows[selected][2]:
+            path.append(rows[selected][0])
+            selected = 0
+
+def node_at(tree, path):
+    node = tree
+    for choice in path:
+        node = node["children"][choice]
+    return node
 
 
 # ---------- Version (shown at the bottom of the home screen) ----------
@@ -631,13 +1002,23 @@ def home_screen(namespace=None):
     # Swap in the versions of wait() and input() that know about the home screen
     game.wait = wait
     builtins.input = input_with_menu
+    install_route_recording()
+    original_die = getattr(game, "die", None)
+    if original_die is not None and not getattr(original_die, "_counted", False):
+        def die(name, scroll=True):
+            record_death(name)
+            return original_die(name, scroll=scroll)
+        die._counted = True
+        game.die = die
     if namespace is not None:
         namespace["wait"] = wait
+        if original_die is not None:
+            namespace["die"] = game.die
     track_achievements()
 
     sys.stdout.write("\033[r\033[?25l")   # use the whole window, and hide the cursor
     try:
-        options = ["Play", "Achievements", "Quit"]
+        options = ["Play", "Achievements", "Stats", "Quit"]
         picked = 0
         while True:
             def draw(selected):
@@ -659,6 +1040,8 @@ def home_screen(namespace=None):
                 sys.exit()
             if options[picked] == "Achievements":
                 achievements_screen()
+            elif options[picked] == "Stats":
+                statistics_screen()
             elif options[picked] == "Play":
                 run = choose_run()
                 if run is not None:
