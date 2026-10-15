@@ -503,8 +503,9 @@ def record_death(name):
 # A typed answer only counts as a choice if it matches one of the options shown
 # in brackets, like (fret) or (accept), or is yes/no to a question with no
 # bracketed options, so rejected answers aren't recorded.
-current_route = []
+current_route = []      # this life's choices so far, as [question, choice] pairs
 _recent_text = []
+_pending = {"question": None, "options": set()}
 
 def _clean(text):
     for symbol in "'().,":
@@ -516,11 +517,26 @@ def _remember_printed(text):
     if len(_recent_text) > 400:
         del _recent_text[:200]
 
+def forget_recent_text():
+    """Clear what's been printed, so menu text never gets mistaken for a story question."""
+    _recent_text.clear()
+    _pending["question"] = None
+    _pending["options"] = set()
+
 def note_answer(answer):
     """Called with everything the player types. Records it if it's one of the offered options."""
-    shown = "".join(_recent_text)
+    plain = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b[78]|\x1b\][^\x07]*\x07", "", "".join(_recent_text))
     _recent_text.clear()
-    options = {_clean(o) for o in re.findall(r"\(([^()\n]{1,40})\)", shown) if re.search(r"[A-Za-z]", o)}
+    lines = [line.strip() for line in plain.splitlines() if line.strip()]
+    # Options are taken from the last few lines only (the question itself), not older text
+    shown = {_clean(o) for o in re.findall(r"\(([^()\n]{1,40})\)", "\n".join(lines[-3:])) if re.search(r"[A-Za-z]", o)}
+    question = lines[-1] if lines else ""
+    if _pending["question"] is None or (shown and _pending["options"] and not (shown & _pending["options"])):
+        # a new question (rather than the game asking the same one again)
+        _pending["question"] = question
+        _pending["options"] = set()
+    _pending["options"] |= shown
+    options = set(_pending["options"])
     choice = _clean(answer)
     if choice and choice in options:
         pass
@@ -528,23 +544,23 @@ def note_answer(answer):
         options = {"yes", "no"}          # yes/no questions don't show their options in brackets
     else:
         return                           # not one of the offered options: the game will ask again
-    # Remember the question asked at this point, for the discovery tree
-    plain = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b[78]", "", shown)
-    lines = [line.strip() for line in plain.splitlines() if line.strip()]
-    questions = stats().setdefault("questions", {})
-    questions[">".join(current_route)] = {"question": lines[-1] if lines else "", "options": sorted(options)}
-    current_route.append(choice)
+    asked = _pending["question"]
+    known = stats().setdefault("question_options", {})
+    known[asked] = sorted(set(known.get(asked, [])) | options)
+    current_route.append([asked, choice])
+    _pending["question"] = None
+    _pending["options"] = set()
 
 def save_route(ending):
     if not current_route and ending is None:
         return
     routes = stats().setdefault("routes", [])
     for route in routes:
-        if route["choices"] == current_route and route["end"] == ending:
+        if route.get("steps") == current_route and route["end"] == ending:
             route["times"] += 1
             break
     else:
-        routes.append({"choices": list(current_route), "end": ending, "times": 1})
+        routes.append({"steps": [list(step) for step in current_route], "end": ending, "times": 1})
     current_route.clear()
 
 def install_route_recording():
@@ -634,6 +650,7 @@ def start_of_life(namespace):
         count_finished_life(run)          # the previous life is over: add its point changes
     run["life_start"] = {"life": lives, "points": points_now()}
     current_route.clear()
+    forget_recent_text()
     if run.get("checkpoint") is None and namespace.get("lives_lived", 0) == 0:
         return   # first life of a new run: nothing worth saving yet
     if "replaces" in run:
@@ -700,6 +717,7 @@ def ask_to_leave():
     answer = read_key()
     sys.stdout.write("\r\033[2K")        # rub the question out again
     sys.stdout.flush()
+    forget_recent_text()
     if hasattr(sys.stdout, "col"):
         sys.stdout.col = 0
     return answer == "enter"
@@ -835,108 +853,137 @@ def discoveries_screen():
             explore_routes(chapter)
 
 def build_tree(chapter=None):
-    """Turn the saved routes into a tree. Each node is a dict:
-    {"children": {choice: node}, "ends": {death: times}}. If a chapter is given,
-    only routes that ended in that chapter are included."""
-    root = {"children": {}, "ends": {}}
+    """Turn the saved routes into a tree. Two kinds of point alternate:
+      a question: {"question": text, "choices": {choice: after}}
+      after a choice: {"next": {question text: question}, "ends": {death: times}}
+    The top of the tree is an "after" point (the start of a life). Keying by the question
+    text means lives that begin at different points of the story still line up properly.
+    If a chapter is given, only routes that ended in that chapter are included."""
+    root = {"next": {}, "ends": {}}
     for route in stats().get("routes", []):
+        if "steps" not in route:
+            continue                    # recorded by an older version of the game
         end = route.get("end") or ""
         if chapter and not end.startswith(chapter + "/"):
             continue
-        node = root
-        for choice in route["choices"]:
-            node = node["children"].setdefault(choice, {"children": {}, "ends": {}})
-        node["ends"][end] = node["ends"].get(end, 0) + route.get("times", 1)
+        point = root
+        for question, choice in route["steps"]:
+            asked = point["next"].setdefault(question, {"question": question, "choices": {}})
+            point = asked["choices"].setdefault(choice, {"next": {}, "ends": {}})
+        point["ends"][end] = point["ends"].get(end, 0) + route.get("times", 1)
     return root
 
-def deaths_below(node):
-    found = set(d for d in node["ends"] if d != "THE ENDING")
-    for child in node["children"].values():
-        found |= deaths_below(child)
+def deaths_below(point):
+    found = set(d for d in point.get("ends", {}) if d != "THE ENDING")
+    for asked in point.get("next", {}).values():
+        for after in asked["choices"].values():
+            found |= deaths_below(after)
     return found
+
+def describe(after):
+    """A short note about what lies beyond a choice."""
+    below = deaths_below(after)
+    if after["next"]:
+        return f"{len(below)} death{'s' if len(below) != 1 else ''} found beyond here" if below else "explored"
+    ends = [death_label(d) if d != "THE ENDING" else "the ending" for d in after["ends"]]
+    return ("✝ " + ", ".join(ends)) if ends else ""
+
+def explorer_screen(crumbs, heading, rows, selected, hint):
+    """Draw one screen of the explorer. rows are (label, note) pairs; the last row is Back."""
+    clear()
+    draw_title()
+    if len(crumbs) > game.size.columns - 4:
+        crumbs = "… " + crumbs[-(game.size.columns - 6):]
+    print(centred(colour(DIM_COLOUR, crumbs), len(crumbs)))
+    print()
+    if heading:
+        q = fit(heading, game.size.columns - 4)
+        print(centred(colour(UNLOCKED_COLOUR, q), len(q)))
+        print()
+    width = max([len(label) for label, _ in rows[:-1]] + [4]) + 4
+    note_room = max(10, game.size.columns - width - 9)
+    block = 3 + width + max([len(fit(note, note_room)) for _, note in rows[:-1]] + [0])
+    margin = " " * max(0, (game.size.columns - block) // 2)    # line the rows up with each other
+    for index, (label, note) in enumerate(rows[:-1]):
+        chosen = index == selected
+        text = ("›  " if chosen else "   ") + fit(label, width + 20).ljust(width)
+        body = colour(HIGHLIGHT_COLOUR, text, bold=True) if chosen else colour(DIM_COLOUR if label == "???" else UNLOCKED_COLOUR, text)
+        note_colour = FOUND_COLOUR if note.startswith("✝") else DIM_COLOUR
+        print(margin + body + colour(note_colour, fit(note, note_room)))
+    print()
+    back = ("›  " if selected == len(rows) - 1 else "   ") + rows[-1][0]
+    print(centred(colour(HIGHLIGHT_COLOUR, back, bold=True) if selected == len(rows) - 1 else colour(DIM_COLOUR, back), len(back)))
+    print()
+    print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
+    sys.stdout.flush()
 
 def explore_routes(chapter=None):
     tree = build_tree(chapter)
-    path = []               # the choices taken to reach the current point
-    selected = 0
-    questions = stats().get("questions", {})
-    while True:
-        node = tree
-        for choice in path:
-            node = node["children"][choice]
-        info = questions.get(">".join(path), {})
-        # Discovered choices from here, then untried options shown as ???
-        rows = []
-        for choice, child in node["children"].items():
-            below = deaths_below(child)
-            if child["children"]:
-                note = f"{len(below)} death{'s' if len(below) != 1 else ''} found beyond here" if below else "explored"
-                rows.append((choice, note, True))
-            else:
-                ends = [death_label(d) if d != "THE ENDING" else "the ending" for d in child["ends"]]
-                rows.append((choice, "✝ " + ", ".join(ends) if ends else "", False))
-        if not chapter:
-            for option in info.get("options", []):
-                if option not in node["children"]:
-                    rows.append(("???", "not yet explored", False))
-        options = [r[0] for r in rows] + ["Back"]
-        selected = min(selected, len(options) - 1)
+    known_options = stats().get("question_options", {})
 
-        clear()
-        draw_title()
-        crumbs = " › ".join(["you exist"] + path)
+    def settle(point, kind):
+        # A point after a choice that only ever led to one question needs no screen
+        # of its own: go straight to that question.
+        while kind == "after" and len(point["next"]) == 1 and not point["ends"]:
+            point, kind = next(iter(point["next"].values())), "question"
+        return point, kind
+
+    stack = [settle(tree, "after") + (None,)]    # screens visited: (point, kind, choice that led here)
+    selected = 0
+    while True:
+        point, kind, _ = stack[-1]
+        labels = [label for _, _, label in stack if label]
+        crumbs = " › ".join(["you exist"] + labels)
         if chapter:
             crumbs = pretty(chapter) + ":  " + crumbs
-        if len(crumbs) > game.size.columns - 4:
-            crumbs = "… " + crumbs[-(game.size.columns - 6):]
-        print(centred(colour(DIM_COLOUR, crumbs), len(crumbs)))
-        print()
-        question = info.get("question", "")
-        if question:
-            q = fit(question, game.size.columns - 4)
-            print(centred(colour(UNLOCKED_COLOUR, q), len(q)))
-            print()
-        if not rows:
-            message = "No routes discovered yet." if not path else "Nothing more found down this path yet."
-            print(centred(colour(DIM_COLOUR, message), len(message)))
-            print()
-        width = max([len(r[0]) for r in rows] + [4]) + 4
-        note_room = max(10, game.size.columns - width - 9)
-        block = 3 + width + max([len(fit(r[1], note_room)) for r in rows] + [0])
-        margin = " " * max(0, (game.size.columns - block) // 2)    # line the rows up with each other
-        for index, (label, note, can_enter) in enumerate(rows):
-            chosen = index == selected
-            text = ("›  " if chosen else "   ") + label.ljust(width)
-            body = colour(HIGHLIGHT_COLOUR, text, bold=True) if chosen else colour(UNLOCKED_COLOUR if label != "???" else DIM_COLOUR, text)
-            note_colour = FOUND_COLOUR if note.startswith("✝") else DIM_COLOUR
-            print(margin + body + colour(note_colour, fit(note, note_room)))
-        print()
-        back = "›  Back" if selected == len(rows) else "   Back"
-        print(centred(colour(HIGHLIGHT_COLOUR, back, bold=True) if selected == len(rows) else colour(DIM_COLOUR, back), len(back)))
-        print()
-        hint = "Enter to follow a choice, Esc to step back"
-        print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
-        sys.stdout.flush()
+        if kind == "question":
+            rows = [(choice, describe(after)) for choice, after in point["choices"].items()]
+            targets = list(point["choices"].values())
+            if not chapter:
+                for option in known_options.get(point["question"], []):
+                    if option not in point["choices"]:
+                        rows.append(("???", "not yet explored"))
+                        targets.append(None)
+            heading = point["question"]
+            hint = "Enter to follow a choice, Esc to step back"
+        else:
+            # Lives went on to different questions from here (or nothing's been found yet)
+            rows, targets = [], []
+            for question, asked in point["next"].items():
+                found = len(deaths_below({"next": {question: asked}, "ends": {}}))
+                rows.append((question, f"{found} death{'s' if found != 1 else ''} found"))
+                targets.append(asked)
+            for death in point["ends"]:
+                rows.append(("✝", death_label(death) if death != "THE ENDING" else "the ending"))
+                targets.append(None)
+            if not rows:
+                heading = "No routes discovered yet." if len(stack) == 1 else "Nothing more found down this path yet."
+            else:
+                heading = "Where lives have begun" if len(stack) == 1 else "This led to different places in different lives"
+            hint = "Enter to follow, Esc to step back"
+        rows.append(("Back", ""))
+        selected = min(selected, len(rows) - 1)
+        explorer_screen(crumbs, heading, rows, selected, hint)
 
         key = read_key()
         if key == "up":
-            selected = (selected - 1) % len(options)
+            selected = (selected - 1) % len(rows)
         elif key == "down":
-            selected = (selected + 1) % len(options)
-        elif key in ("back", "left") or (key == "enter" and selected == len(rows)):
-            if not path:
+            selected = (selected + 1) % len(rows)
+        elif key in ("back", "left") or (key == "enter" and selected == len(rows) - 1):
+            if len(stack) == 1:
                 return
-            last = path.pop()
-            selected = list(node_at(tree, path)["children"]).index(last)
-        elif key in ("enter", "right") and selected < len(rows) and rows[selected][2]:
-            path.append(rows[selected][0])
+            stack.pop()
             selected = 0
-
-def node_at(tree, path):
-    node = tree
-    for choice in path:
-        node = node["children"][choice]
-    return node
+        elif key in ("enter", "right") and selected < len(rows) - 1 and targets[selected] is not None:
+            target = targets[selected]
+            if kind == "question":
+                if not target["next"]:
+                    continue            # this choice ended in a death: nothing further to explore
+                stack.append(settle(target, "after") + (rows[selected][0],))
+            else:
+                stack.append((target, "question", None))
+            selected = 0
 
 
 # ---------- Version (shown at the bottom of the home screen) ----------
