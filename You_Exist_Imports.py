@@ -548,7 +548,6 @@ def v2vb(text1, text2): # 2 voices, the colour of other voices (grey), b for bac
     print(text2)
     wait()
 
-
 first_path = True
 
 def rng(boundary): # okay this shit doesn't work just whack this thingo in whenever you want rng
@@ -559,6 +558,113 @@ def rng(boundary): # okay this shit doesn't work just whack this thingo in whene
     elif chance >= boundary:
         first_path = False
 
+##### Story and choices #####
+# ask() does the usual "tell some story, ask a question, and keep asking until the
+# player picks one of the options" in one go. For example:
+#
+#   choice = ask(["You are stuck on the idea that your thoughts aren't what they should be.",
+#                 "Do you (fret) over it, or (accept) what you are?"],
+#                ["fret", "accept"],
+#                retry=["I swear I just said I only had two options, and yet here I am thinking of '{choice}'.",
+#                       "How about this time I just decide to (fret) or (accept)?"])
+#
+# story   the lines to show. The last one is the question; every other line waits for a key.
+# options the answers the game accepts. To accept other words too, use a dictionary:
+#         {"behind": ["back", "backward", "backwards"], "ahead": []}  (ask() always returns the main word)
+# retry   the lines shown when the answer isn't an option. {choice} is replaced with what they typed.
+#         Leave it out for a simple default.
+# style / retry_style   how lines look: "normal", "being", "voices", "bold", or an (R, G, B) colour.
+#
+# To give one line its own look, write it as a pair instead of plain text:
+#   ("being", "So you've finally decided to listen.")
+#   ("hater", "Of course you do.")          <- a buddy, with their name in front
+#   ("loneliness", "Alone.")                <- an emotion (normal colour until it's discovered)
+#   ((230, 50, 10), "Something angry flickers.")
+#
+# Styles: "normal", "being", "voices", "bold",
+#         emotions: "loneliness", "happiness", "anger",
+#         buddies:  "buddy", "grump", "idiot", "nerd", "stoner", "caveman", "judger",
+#                   "preacher", "lover", "hater"
+# The emotion and buddy styles use your own emotion.* and buddy.* functions, so they always
+# match them exactly (colours, names, discovery), but without their built-in wait, which
+# means they work as the question line too.
+#
+# You can also pass one of your own functions, like (emotion.loneliness, "...").
+# ask() won't add a wait after those, since functions like p(), being() and the
+# emotions already wait for a key themselves.
+
+ASK_STYLES = {
+    "normal": lambda text: print(text),
+    "being":  lambda text: cprint(text, "red", attrs=["bold", "dark"]),
+    "voices": lambda text: cprint(text, "light_grey", attrs=["dark"]),
+    "bold":   lambda text: cprint(text, attrs=["bold"]),
+}
+
+# Looked up only when used, since the emotion and buddy classes come later in this file
+CHARACTER_STYLES = {
+    "loneliness": lambda: emotion.loneliness, "happiness": lambda: emotion.happiness, "anger": lambda: emotion.anger,
+    "buddy": lambda: buddy.b, "grump": lambda: buddy.grump, "idiot": lambda: buddy.idiot, "nerd": lambda: buddy.nerd,
+    "stoner": lambda: buddy.stoner, "caveman": lambda: buddy.caveman, "judger": lambda: buddy.judger,
+    "preacher": lambda: buddy.preacher, "lover": lambda: buddy.lover, "hater": lambda: buddy.hater,
+}
+
+def _without_waiting(function, text):
+    """Run one of the emotion/buddy functions, but skip the wait() inside it."""
+    real_wait = globals()["wait"]
+    globals()["wait"] = lambda: None
+    try:
+        function(text)
+    finally:
+        globals()["wait"] = real_wait
+
+def _say(line, style, wait_after):
+    how, text = line if isinstance(line, tuple) else (style, line)
+    if isinstance(how, str) and how in CHARACTER_STYLES:
+        _without_waiting(CHARACTER_STYLES[how](), text)
+        if wait_after:
+            wait()
+        return
+    if callable(how):
+        how(text)                     # one of your own functions: it handles its own waiting
+        return
+    if isinstance(how, tuple):
+        r, g, b = how
+        print(f"\033[38;2;{r};{g};{b}m{text}\033[0m")
+    else:
+        ASK_STYLES[how](text)
+    if wait_after:
+        wait()
+
+def ask(story, options, retry=None, style="normal", retry_style="normal"):
+    if isinstance(options, dict):
+        accepted = {main: main for main in options}
+        for main, others in options.items():
+            for other in others:
+                accepted[other] = main
+    else:
+        accepted = {option: option for option in options}
+    question = story[-1] if isinstance(story[-1], str) else story[-1][1]
+
+    for i, line in enumerate(story):
+        _say(line, style, wait_after=(i < len(story) - 1))
+    while True:
+        # Tell the discovery tree exactly which question this is and what counts as an answer
+        globals()["asking"] = {"question": question, "accepted": accepted}
+        answer = rp(input("> ").lower().strip())
+        globals()["asking"] = None
+        if answer in accepted:
+            return accepted[answer]
+        lines = retry or [f"'{answer}' isn't one of your options.", question]
+        lines = [(l[0], l[1].replace("{choice}", answer)) if isinstance(l, tuple) else l.replace("{choice}", answer) for l in lines]
+        for i, line in enumerate(lines):
+            _say(line, retry_style, wait_after=(i < len(lines) - 1))
+
+asking = None
+
+def tell(lines, style="normal"):
+    """Show lines of dialogue, waiting for a key after each one. Lines work just like in ask()."""
+    for line in lines:
+        _say(line, style, wait_after=True)
 
 
 ##### Emotions #####

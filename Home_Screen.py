@@ -525,6 +525,17 @@ def forget_recent_text():
 
 def note_answer(answer):
     """Called with everything the player types. Records it if it's one of the offered options."""
+    hint = getattr(game, "asking", None)
+    if hint:
+        # The question came from ask(), which says exactly what it is and what counts
+        forget_recent_text()
+        choice = hint["accepted"].get(_clean(answer))
+        if choice is not None:
+            question = hint["question"]
+            known = stats().setdefault("question_options", {})
+            known[question] = sorted(set(known.get(question, [])) | set(hint["accepted"].values()))
+            current_route.append([question, choice])
+        return
     plain = re.sub(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b[78]|\x1b\][^\x07]*\x07", "", "".join(_recent_text))
     _recent_text.clear()
     lines = [line.strip() for line in plain.splitlines() if line.strip()]
@@ -675,6 +686,30 @@ def finish_run():
         run["finished"] = True
         run["last_played"] = now()
         save_progress()
+
+
+# ---------- Freezing the keyboard ----------
+import contextlib
+
+@contextlib.contextmanager
+def frozen_keyboard():
+    """While the screen clears after a death, key presses aren't shown and are thrown
+    away afterwards, so keys pressed during the scroll can't skip lines of the next life."""
+    try:
+        fd = sys.stdin.fileno()
+        old_settings = termios.tcgetattr(fd)
+    except (OSError, ValueError, termios.error):
+        yield                      # not a real terminal: nothing to freeze
+        return
+    new_settings = termios.tcgetattr(fd)
+    new_settings[3] &= ~(termios.ECHO | termios.ICANON)
+    termios.tcsetattr(fd, termios.TCSANOW, new_settings)
+    try:
+        yield
+    finally:
+        time.sleep(0.2)                            # catch presses right at the end of the scroll
+        termios.tcflush(fd, termios.TCIFLUSH)      # throw away everything pressed meanwhile
+        termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
 
 
 # ---------- Getting back to the home screen ----------
@@ -1054,7 +1089,8 @@ def home_screen(namespace=None):
     if original_die is not None and not getattr(original_die, "_counted", False):
         def die(name, scroll=True):
             record_death(name)
-            return original_die(name, scroll=scroll)
+            with frozen_keyboard():
+                return original_die(name, scroll=scroll)
         die._counted = True
         game.die = die
     if namespace is not None:
