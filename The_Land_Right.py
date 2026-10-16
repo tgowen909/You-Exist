@@ -200,7 +200,7 @@ if choice == "existences": # DONE
                 ("lover", "Oh, I don't really have a name either..."),
                 ("lover", "How about you choose?"),
             ])
-            print("\033[38;2;{};{};{}m{}\033[39m".format(230, 50, 170, lover_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(230, 50, 170, textwrap.fill("What would you like to call me?", width=(int(os.environ['COLUMNS'])-len(lover_buddy_name)))))
+            print("\033[38;2;{};{};{}m{}\033[39m".format(230, 50, 170, lover_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(230, 50, 170, textwrap.fill("What would you like to call me?", width=(int(os.environ['COLUMNS'])-len(lover_buddy_name)-3))))
             name = input("> ").strip()
             name_simple = name[0].upper() + name[1:]
             lover_buddy_name = name_buddy.lover(name_simple)

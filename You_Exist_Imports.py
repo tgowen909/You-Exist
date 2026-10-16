@@ -791,52 +791,52 @@ class name_buddy:
 class buddy():  
     def b(text):
         global buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(109, 226, 148, buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(109, 226, 148, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(109, 226, 148, buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(109, 226, 148, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(buddy_name)-3))))
         wait()
     
     def grump(text):
         global grumpy_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(106, 29, 245, grumpy_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(106, 29, 245, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(grumpy_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(106, 29, 245, grumpy_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(106, 29, 245, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(grumpy_buddy_name)-3))))
         wait()
 
     def idiot(text):
         global idiot_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(107, 222, 247, idiot_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(107, 222, 247, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(idiot_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(107, 222, 247, idiot_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(107, 222, 247, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(idiot_buddy_name)-3))))
         wait()
 
     def nerd(text):
         global nerd_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(35, 79, 26, nerd_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(35, 79, 26, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(nerd_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(35, 79, 26, nerd_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(35, 79, 26, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(nerd_buddy_name)-3))))
         wait()
 
     def stoner(text):
         global stoner_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(183, 228, 150, stoner_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(183, 228, 150, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(stoner_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(183, 228, 150, stoner_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(183, 228, 150, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(stoner_buddy_name)-3))))
         wait()
     
     def caveman(text):
         global caveman_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(111, 41, 27, caveman_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(111, 41, 27, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(caveman_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(111, 41, 27, caveman_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(111, 41, 27, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(caveman_buddy_name)-3))))
         wait()
     
     def judger(text):
         global judger_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(188, 152, 216, judger_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(188, 152, 216, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(judger_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(188, 152, 216, judger_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(188, 152, 216, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(judger_buddy_name)-3))))
         wait()
 
     def preacher(text):
         global preacher_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(237, 114, 110, preacher_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(237, 114, 110, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(preacher_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(237, 114, 110, preacher_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(237, 114, 110, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(preacher_buddy_name)-3))))
         wait()
 
     def lover(text):
         global lover_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(212, 67, 166, lover_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(212, 67, 166, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(lover_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(212, 67, 166, lover_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(212, 67, 166, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(lover_buddy_name)-3))))
         wait()
 
     def hater(text):
         global hater_buddy_name
-        print("\033[38;2;{};{};{}m{}\033[39m".format(230, 64, 37, hater_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(230, 64, 37, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(hater_buddy_name)))))
+        print("\033[38;2;{};{};{}m{}\033[39m".format(230, 64, 37, hater_buddy_name) + ": \033[38;2;{};{};{}m{} \033[39m".format(230, 64, 37, textwrap.fill(text, width=(int(os.environ['COLUMNS'])-len(hater_buddy_name)-3))))
         wait()
 
 
