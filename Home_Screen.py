@@ -1131,6 +1131,15 @@ def _tell_my_tab(command):
     except Exception:
         return None
 
+def _resize_text_command(size):
+    # Changing the text size on its own makes Terminal keep the same number of rows and
+    # columns, so the window grows (even past the edge of the screen). Putting the window
+    # back to its old size afterwards keeps it the same size on screen, with the text
+    # simply fitting more or fewer rows and columns inside it.
+    return (f"set oldBounds to bounds of w\n"
+            f"                    set font size of t to {int(size)}\n"
+            f"                    set bounds of w to oldBounds")
+
 def current_text_size():
     answer = _tell_my_tab("return font size of t")
     try:
@@ -1140,7 +1149,7 @@ def current_text_size():
 
 def set_text_size(size):
     size = max(MIN_TEXT_SIZE, min(MAX_TEXT_SIZE, int(size)))
-    if _tell_my_tab(f"set font size of t to {size}") is None:
+    if _tell_my_tab(_resize_text_command(size)) is None:
         return False
     _run_store().setdefault("settings", {})["text_size"] = size
     save_progress()
@@ -1149,7 +1158,7 @@ def set_text_size(size):
 def apply_saved_settings():
     size = _run_store().get("settings", {}).get("text_size")
     if size:
-        _tell_my_tab(f"set font size of t to {int(size)}")
+        _tell_my_tab(_resize_text_command(size))
 
 def settings_screen():
     message = ""
