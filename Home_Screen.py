@@ -285,6 +285,17 @@ def track(path, title=None, wait_for_it=False):
         thread.join(timeout=3)   # for signals sent just before the game restarts
     return thread
 
+def play_achievement_sound(name):
+    """Every achievement plays ACHIEVEMENT_SOUND, unless ACHIEVEMENT_SOUNDS gives it
+    its own (both are set in You_Exist_Imports.py). Use None there for silence."""
+    sounds = getattr(game, "ACHIEVEMENT_SOUNDS", {})
+    sound = sounds[name] if name in sounds else getattr(game, "ACHIEVEMENT_SOUND", None)
+    if sound and hasattr(game, "play_sound"):
+        try:
+            game.play_sound(sound)
+        except Exception:
+            pass   # a sound problem should never stop the game
+
 def track_achievements():
     """Records each achievement the moment a player unlocks it."""
     achievements = getattr(game, "achievements", None)
@@ -303,6 +314,7 @@ def track_achievements():
                 result = func(*args, **kwargs)
                 if not was_gotten and getattr(game, flag):
                     track(f"/achievement/{name}", f"Achievement: {name.replace('_', ' ')}")
+                    play_achievement_sound(name)
                 return result
             wrapper._tracked = True
             return wrapper

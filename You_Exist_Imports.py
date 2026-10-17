@@ -420,6 +420,14 @@ def play_sound(filename):
         subprocess.Popen(["afplay", path], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          start_new_session=True)
 
+# The sound every achievement plays (from the Audio folder)
+ACHIEVEMENT_SOUND = "Heartbeat.wav"
+
+# Achievements that play something else instead. Use None for no sound at all.
+ACHIEVEMENT_SOUNDS = {
+    "Crazy_Dave": "Crazy_Dave.wav",
+}
+
 def rp(inp):
     punctuation = "\'().,"
     for symbol in punctuation:
@@ -933,7 +941,6 @@ class achievements(): # Notification("Description").with_subtitle("Title").send(
         if Crazy_Dave_Gotten == False:
             if insanity >= (10): # can change
                 Notification("Reach an Insanity score of 10").with_subtitle("Crazy Dave").with_title("You Exist").send()
-                play_sound("Crazy_Dave.wav")
                 Crazy_Dave_Gotten = True
             else:
                 pass
