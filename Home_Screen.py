@@ -715,6 +715,11 @@ def start_of_life(namespace):
     if run is None:
         return
     life = namespace.get("lives_lived", 0) + 1
+    if hasattr(game, "story_home"):
+        game.set_scroll_region()
+        game.story_home()              # start the new life inside the margins again
+        if hasattr(sys.stdout, "col"):
+            sys.stdout.col = 0
     track(f"/life/{life}", f"Started life {life}")
     sync_text_size()
     lives = namespace.get("lives_lived", 0)
@@ -1191,8 +1196,27 @@ def set_story_area(index):
     _run_store().setdefault("settings", {})["story_area"] = game.STORY_AREA
     save_progress()
 
+MARGIN_LIMITS = {"SIDE_MARGIN": (0, 20), "TOP_MARGIN": (0, 10)}
+
+def set_margin(name, value):
+    low, high = MARGIN_LIMITS[name]
+    value = max(low, min(high, value))
+    if name == "SIDE_MARGIN" and game.size.full_columns - 2 * value < 20:
+        return False                   # leave at least 20 columns for the text
+    setattr(game, name, value)
+    if name == "SIDE_MARGIN":
+        game.size.update()             # recalculate the width inside the margins
+    _run_store().setdefault("settings", {})[name.lower()] = value
+    save_progress()
+    return True
+
 def apply_saved_settings():
     settings = _run_store().get("settings", {})
+    for name in MARGIN_LIMITS:
+        if name.lower() in settings and hasattr(game, name):
+            setattr(game, name, settings[name.lower()])
+    if hasattr(game.size, "full_columns"):
+        game.size.update()
     if settings.get("text_size"):
         _tell_my_tab(_resize_text_command(settings["text_size"]))
     if settings.get("story_area") and hasattr(game, "STORY_AREA"):
@@ -1200,17 +1224,25 @@ def apply_saved_settings():
 
 def settings_screen():
     message = ""
-    row = 0                      # 0 = text size, 1 = story area
+    row = 0
     sync_text_size()
     while True:
         size = current_text_size()
         area = current_story_area()
+        # each row: (label, value shown, note, function to call with +1 or -1)
         rows = []
         if size is not None:
-            rows.append(("Text size", str(size)))
-        rows.append(("Story area", STORY_AREAS[area][0]))
+            rows.append(("Text size", str(size), "",
+                         lambda step: set_text_size(size + step) if MIN_TEXT_SIZE <= size + step <= MAX_TEXT_SIZE else False))
+        rows.append(("Story area", STORY_AREAS[area][0], "How much of the window the story uses.",
+                     lambda step: set_story_area(area + step) if 0 <= area + step < len(STORY_AREAS) else False))
+        if hasattr(game, "SIDE_MARGIN"):
+            rows.append(("Side margins", str(game.SIDE_MARGIN), "Blank space on the left and right of the text.",
+                         lambda step: set_margin("SIDE_MARGIN", game.SIDE_MARGIN + step) if MARGIN_LIMITS["SIDE_MARGIN"][0] <= game.SIDE_MARGIN + step <= MARGIN_LIMITS["SIDE_MARGIN"][1] else False))
+            rows.append(("Top margin", str(game.TOP_MARGIN), "Blank lines above the story.",
+                         lambda step: set_margin("TOP_MARGIN", game.TOP_MARGIN + step) if MARGIN_LIMITS["TOP_MARGIN"][0] <= game.TOP_MARGIN + step <= MARGIN_LIMITS["TOP_MARGIN"][1] else False))
         row = min(row, len(rows) - 1)
-        label_width = max(len(label) for label, _ in rows) + 5
+        label_width = max(len(r[0]) for r in rows) + 5
         value_width = max(len(name) for name, _ in STORY_AREAS) + 6
 
         clear()
@@ -1218,7 +1250,7 @@ def settings_screen():
         heading = "Settings"
         print(centred(colour(UNLOCKED_COLOUR, heading, bold=True), len(heading)))
         print()
-        for index, (label, value) in enumerate(rows):
+        for index, (label, value, _, _) in enumerate(rows):
             line = label.ljust(label_width) + f"‹  {value}  ›".center(value_width)
             if index == row:
                 print(centred(colour(HIGHLIGHT_COLOUR, "›  " + line, bold=True), len(line) + 3))
@@ -1231,8 +1263,8 @@ def settings_screen():
                 notes.append("Text size can only be changed in the game itself, not in VS Code.")
             else:
                 notes.append("The text size can't be changed from here in this window.")
-        if rows[row][0] == "Story area":
-            notes.append("How much of the window the story uses.")
+        if rows[row][2]:
+            notes.append(rows[row][2])
         if message:
             notes.append(message)
         for note in notes:
@@ -1251,16 +1283,9 @@ def settings_screen():
         elif key == "down":
             row = (row + 1) % len(rows)
         elif key in ("right", "plus", "left", "minus"):
-            bigger = key in ("right", "plus")
-            if rows[row][0] == "Text size":
-                if bigger and size < MAX_TEXT_SIZE:
-                    set_text_size(size + 1)
-                elif not bigger and size > MIN_TEXT_SIZE:
-                    set_text_size(size - 1)
-                else:
-                    message = "That's the largest size." if bigger else "That's the smallest size."
-            else:
-                set_story_area(area + (1 if bigger else -1))
+            step = 1 if key in ("right", "plus") else -1
+            if rows[row][3](step) is False:
+                message = "That's as far as it goes."
 
 
 # ---------- Version (shown at the bottom of the home screen) ----------

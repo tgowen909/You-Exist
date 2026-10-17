@@ -330,6 +330,31 @@ def _input_with_wrap(prompt=""):
     return answer
 builtins.input = _input_with_wrap
 
+##### Hide stray key presses #####
+# Keys pressed while the story is printing (not at a prompt) would otherwise appear
+# on screen as stray letters. Showing typed keys is switched off for the whole game,
+# and switched back on only while the player is typing an answer.
+import termios, atexit
+try:
+    _keyboard = sys.stdin.fileno()
+    _normal_keyboard = termios.tcgetattr(_keyboard)
+    _quiet_keyboard = termios.tcgetattr(_keyboard)
+    _quiet_keyboard[3] &= ~termios.ECHO
+    termios.tcsetattr(_keyboard, termios.TCSANOW, _quiet_keyboard)
+    # put things back when the game closes (otherwise VS Code's terminal would stay "silent")
+    atexit.register(lambda: termios.tcsetattr(_keyboard, termios.TCSANOW, _normal_keyboard))
+
+    _input_without_echo = builtins.input
+    def _input_with_echo(prompt=""):
+        termios.tcsetattr(_keyboard, termios.TCSANOW, _normal_keyboard)
+        try:
+            return _input_without_echo(prompt)
+        finally:
+            termios.tcsetattr(_keyboard, termios.TCSANOW, _quiet_keyboard)
+    builtins.input = _input_with_echo
+except (OSError, ValueError, termios.error):
+    pass   # not running in a real terminal: nothing to hide
+
 os.system('clear')
 os.system('tput vi')
 
