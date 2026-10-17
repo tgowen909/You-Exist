@@ -6,7 +6,7 @@
 #  Runs: each playthrough is a "run". Progress is saved at the start of every life,
 #  so a run can be continued later from the start of the life the player was on.
 #  Pressing Esc while the story is waiting for a key (or typing "menu" at a choice)
-#  returns to the home screen.
+#  opens a pause menu, which can resume the story or return to the home screen.
 # ============================================================
 
 import os
@@ -99,6 +99,10 @@ def read_key():
         return "enter"
     if key in (b"\x1b", b"q", b"Q", b"\x7f"):
         return "back"
+    if key in (b"+", b"="):
+        return "plus"
+    if key in (b"-", b"_"):
+        return "minus"
     if key.isdigit():
         return key.decode()
     return None
@@ -574,13 +578,47 @@ def save_route(ending):
         routes.append({"steps": [list(step) for step in current_route], "end": ending, "times": 1})
     current_route.clear()
 
+# Everything the story prints is also kept (the last few thousand characters),
+# so the screen can be put back exactly as it was after the pause menu.
+_recording = {"on": True}
+_screen_history = []
+_history_length = [0]
+
+def _remember_for_redraw(text):
+    _screen_history.append(text)
+    _history_length[0] += len(text)
+    while _history_length[0] > 20000 and len(_screen_history) > 1:
+        _history_length[0] -= len(_screen_history.pop(0))
+
+def redraw_story():
+    """Put the story back on screen after the pause menu: the half-screen layout,
+    with the most recent lines the player was reading."""
+    raw = "".join(_screen_history)
+    # keep colours, but drop anything that moves the cursor or clears the screen
+    raw = re.sub(r"\x1b\[[0-9;?]*[A-Za-ln-z]|\x1b[78]|\x1b\][^\x07]*\x07|\r", "", raw)
+    lines = raw.split("\n")
+    keep = max(1, game.size.lines // 2)
+    text = "\n".join(lines[-(keep + 1):]).lstrip("\n")
+    clear()
+    game.set_scroll_region()
+    sys.stdout.write("\033[H")
+    _recording["on"] = False          # this is a replay, not new story
+    try:
+        sys.stdout.write(text)
+        sys.stdout.flush()
+    finally:
+        _recording["on"] = True
+
+
 def install_route_recording():
     out = sys.stdout
     if getattr(out, "_route_tap", False):
         return
     original_write = out.write
     def write(text):
-        _remember_printed(text)
+        if _recording["on"]:
+            _remember_printed(text)
+            _remember_for_redraw(text)
         return original_write(text)
     try:
         out.write = write
@@ -662,6 +700,8 @@ def start_of_life(namespace):
     run["life_start"] = {"life": lives, "points": points_now()}
     current_route.clear()
     forget_recent_text()
+    _screen_history.clear()            # the pause menu only ever redraws this life's story
+    _history_length[0] = 0
     if run.get("checkpoint") is None and namespace.get("lives_lived", 0) == 0:
         return   # first life of a new run: nothing worth saving yet
     if "replaces" in run:
@@ -738,27 +778,54 @@ def obliterate():
     time.sleep(1)   # a brief, empty pause before the home screen appears
     back_to_home_screen(track_leaving=False)
 
-def ask_to_leave():
-    """Shows a one-line question. Returns True if the player wants to go home.
-    During a new run's first life there's nothing to lose, so it doesn't ask."""
-    run = getattr(game, "current_run", None)
-    if run is None or run.get("checkpoint") is None:
-        return True
-    question = "Return to the home screen? You'll continue from the start of this life.  (Enter/Space: Yes. Any other key: No)"
-    question = fit(question, game.size.columns - 1)
-    sys.stdout.write("\r\033[2K")
-    sys.stdout.write(colour(DIM_COLOUR, question))
-    sys.stdout.flush()
-    answer = read_key()
-    sys.stdout.write("\r\033[2K")        # rub the question out again
-    sys.stdout.flush()
-    forget_recent_text()
-    if hasattr(sys.stdout, "col"):
-        sys.stdout.col = 0
-    return answer == "enter"
+def pause_menu():
+    """The menu shown when the player presses Esc (or types "menu") during a run."""
+    _recording["on"] = False          # the menu isn't part of the story
+    sys.stdout.write("\033[?25l")
+    leaving = False
+    try:
+        options = ["Resume", "Achievements", "Stats", "Settings", "Return to the home screen", "Quit"]
+        run = getattr(game, "current_run", None)
+        if run is None or run.get("checkpoint") is None:
+            note = "This run is saved once your first life is over."
+        else:
+            note = "Your run is saved at the start of each life."
+        picked = 0
+        while True:
+            def draw(selected):
+                clear()
+                print("\n" * max(0, game.size.lines // 4 - 4), end="")
+                draw_title()
+                print(centred(colour(UNLOCKED_COLOUR, "Paused", bold=True), 6))
+                print(centred(colour(DIM_COLOUR, fit(note, game.size.columns - 2)), min(len(note), game.size.columns - 2)))
+                print()
+                draw_menu(options, selected, "↑ ↓ to move, Enter to select, Esc to resume")
+            picked = choose(options, draw, picked)
+            if picked is None or options[picked] == "Resume":
+                return
+            if options[picked] == "Achievements":
+                achievements_screen()
+            elif options[picked] == "Stats":
+                statistics_screen()
+            elif options[picked] == "Settings":
+                settings_screen()
+            elif options[picked] == "Return to the home screen":
+                leaving = True
+                back_to_home_screen()
+            elif options[picked] == "Quit":
+                leaving = True
+                clear()
+                sys.stdout.write("\033[?25h")
+                sys.stdout.flush()
+                sys.exit()
+    finally:
+        if not leaving:
+            sys.stdout.write("\033[?25h")
+            redraw_story()
+        _recording["on"] = True
 
 def wait():
-    """Waits for a key press, like before, but Esc offers to go back to the home screen."""
+    """Waits for a key press, like before, but Esc opens the pause menu."""
     sys.stdout.flush()
     fd = sys.stdin.fileno()
     while True:
@@ -776,20 +843,18 @@ def wait():
             termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
         if data != b"\x1b":            # anything but a lone Esc: carry on with the story
             return
-        if ask_to_leave():
-            back_to_home_screen()
-        # they said no: keep waiting for a key to continue the story
+        pause_menu()
+        # back from the pause menu: keep waiting for a key to continue the story
 
 _original_input = builtins.input
 def input_with_menu(prompt=""):
-    """Typing "menu" at any choice also offers to go back to the home screen."""
+    """Typing "menu" at any choice opens the pause menu, just like Esc."""
     while True:
         answer = _original_input(prompt)
         if answer.strip().lower() != "menu":
             note_answer(answer)
             return answer
-        if ask_to_leave():
-            back_to_home_screen()
+        pause_menu()                   # then ask the question again
 
 
 # ---------- Discoveries ----------
@@ -1021,6 +1086,101 @@ def explore_routes(chapter=None):
             selected = 0
 
 
+# ---------- Settings: text size ----------
+# Mac Terminal lets a program change the text size of its own tab, so the game can
+# offer a text size setting. It's saved, and applied again every time the game opens.
+# (Players can also press Cmd + and Cmd - at any time, which Terminal handles itself.)
+import subprocess
+MIN_TEXT_SIZE, MAX_TEXT_SIZE = 9, 36
+
+def _tell_my_tab(command):
+    """Run an AppleScript command on the game's own Terminal tab (called t).
+    Returns the result as text, or None if it isn't possible (e.g. in VS Code)."""
+    if os.environ.get("TERM_PROGRAM") != "Apple_Terminal":
+        return None
+    try:
+        my_tab = os.ttyname(sys.stdin.fileno())
+    except OSError:
+        return None
+    script = f"""
+    tell application "Terminal"
+        repeat with w in windows
+            repeat with t in tabs of w
+                if tty of t is "{my_tab}" then
+                    {command}
+                end if
+            end repeat
+        end repeat
+    end tell
+    """
+    try:
+        result = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=5)
+        return result.stdout.strip() if result.returncode == 0 else None
+    except Exception:
+        return None
+
+def current_text_size():
+    answer = _tell_my_tab("return font size of t")
+    try:
+        return int(float(answer))
+    except (TypeError, ValueError):
+        return None
+
+def set_text_size(size):
+    size = max(MIN_TEXT_SIZE, min(MAX_TEXT_SIZE, int(size)))
+    if _tell_my_tab(f"set font size of t to {size}") is None:
+        return False
+    _run_store().setdefault("settings", {})["text_size"] = size
+    save_progress()
+    return True
+
+def apply_saved_settings():
+    size = _run_store().get("settings", {}).get("text_size")
+    if size:
+        _tell_my_tab(f"set font size of t to {int(size)}")
+
+def settings_screen():
+    message = ""
+    while True:
+        size = current_text_size()
+        clear()
+        draw_title()
+        heading = "Settings"
+        print(centred(colour(UNLOCKED_COLOUR, heading, bold=True), len(heading)))
+        print()
+        if size is None:
+            if os.environ.get("TERM_PROGRAM") == "vscode":
+                first = "Text size can only be changed in the game itself, not in VS Code."
+            else:
+                first = "The text size can't be changed from here in this window."
+            lines = [first, "You can still press Cmd + and Cmd - to change it at any time."]
+            for line in lines:
+                print(centred(colour(DIM_COLOUR, fit(line, game.size.columns - 2)), min(len(line), game.size.columns - 2)))
+            hint = "Esc to go back"
+        else:
+            control = f"Text size     ‹  {size}  ›"
+            print(centred(colour(HIGHLIGHT_COLOUR, control, bold=True), len(control)))
+            print()
+            note = message or "You can also press Cmd + and Cmd - at any time."
+            print(centred(colour(DIM_COLOUR, fit(note, game.size.columns - 2)), min(len(note), game.size.columns - 2)))
+            hint = "← → or - + to change the size, Esc to go back"
+        print()
+        print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
+        sys.stdout.flush()
+
+        key = read_key()
+        if key in ("back", "enter"):
+            return
+        if size is not None and key in ("right", "plus", "up"):
+            if size < MAX_TEXT_SIZE:
+                set_text_size(size + 1)
+            message = "" if size < MAX_TEXT_SIZE else "That's the largest size."
+        elif size is not None and key in ("left", "minus", "down"):
+            if size > MIN_TEXT_SIZE:
+                set_text_size(size - 1)
+            message = "" if size > MIN_TEXT_SIZE else "That's the smallest size."
+
+
 # ---------- Version (shown at the bottom of the home screen) ----------
 # Shows the date of the latest update, worked out automatically from GitHub:
 # the launcher remembers which version it downloaded, and the date of that
@@ -1099,9 +1259,10 @@ def home_screen(namespace=None):
             namespace["die"] = game.die
     track_achievements()
 
+    apply_saved_settings()
     sys.stdout.write("\033[r\033[?25l")   # use the whole window, and hide the cursor
     try:
-        options = ["Play", "Achievements", "Stats", "Quit"]
+        options = ["Play", "Achievements", "Stats", "Settings", "Quit"]
         picked = 0
         while True:
             def draw(selected):
@@ -1125,6 +1286,8 @@ def home_screen(namespace=None):
                 achievements_screen()
             elif options[picked] == "Stats":
                 statistics_screen()
+            elif options[picked] == "Settings":
+                settings_screen()
             elif options[picked] == "Play":
                 run = choose_run()
                 if run is not None:
