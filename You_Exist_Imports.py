@@ -438,6 +438,11 @@ class points: # maybe change it so that if change == 0, then you dont print (cha
 # The folder the game files are in (works in VS Code, in the app, and with the launcher)
 GAME_FOLDER = os.path.dirname(os.path.abspath(__file__))
 
+# How fast the screen scrolls away after a death, and how long the empty screen stays
+# before the next life (both changeable in Settings: these are the "Medium" values)
+DEATH_SCROLL_DELAY = 0.075     # seconds per line, or None for no scroll at all
+BETWEEN_LIVES_PAUSE = 2        # seconds
+
 def die(name, scroll=True):
     """Every death in the story ends with this. It records which death it was on
     your GoatCounter dashboard (as /death/<name>), then scrolls the screen away
@@ -449,17 +454,21 @@ def die(name, scroll=True):
         signal_thread = track(f"/death/{name}", f"Death: {name}")
     except Exception:
         pass   # tracking is never allowed to break the game
-    if scroll:
+    if scroll and DEATH_SCROLL_DELAY is not None:     # None means "Instant": no scroll at all
         ending_lines = story_last_row() - story_first_row()
         if ending_lines == 1:
             print()
             ending_lines -= 1
         while ending_lines > 1:
             print()
-            time.sleep(0.075)
+            time.sleep(DEATH_SCROLL_DELAY)
             ending_lines -= 1
-    elif signal_thread is not None:
+    elif not scroll and signal_thread is not None:
         signal_thread.join(timeout=3)   # give the signal a moment to send before the game closes
+
+def between_lives_pause():
+    """The pause on the cleared screen before the next life starts."""
+    time.sleep(BETWEEN_LIVES_PAUSE)
 
 def play_sound(filename):
     # Plays a sound from the Audio folder in the background, using the Mac's

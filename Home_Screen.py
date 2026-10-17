@@ -1363,6 +1363,15 @@ def set_story_area(index):
     _run_store().setdefault("settings", {})["story_area"] = game.STORY_AREA
     save_progress()
 
+# name, seconds per line of the death scroll (None = no scroll), pause before the next life
+DEATH_SPEEDS = [("Slow", 0.12, 3), ("Medium", 0.075, 2), ("Fast", 0.03, 1), ("Instant", None, 0)]
+
+def apply_death_speed(name):
+    for speed, delay, pause in DEATH_SPEEDS:
+        if speed == name:
+            game.DEATH_SCROLL_DELAY = delay
+            game.BETWEEN_LIVES_PAUSE = pause
+
 MARGIN_LIMITS = {"SIDE_MARGIN": (0, 20), "TOP_MARGIN": (0, 10)}
 
 def set_margin(name, value):
@@ -1382,6 +1391,8 @@ def apply_saved_settings():
     for name in MARGIN_LIMITS:
         if name.lower() in settings and hasattr(game, name):
             setattr(game, name, settings[name.lower()])
+    if settings.get("death_speed") and hasattr(game, "DEATH_SCROLL_DELAY"):
+        apply_death_speed(settings["death_speed"])
     if hasattr(game.size, "full_columns"):
         game.size.update()
     if settings.get("text_size"):
@@ -1411,6 +1422,18 @@ def settings_screen():
             save_progress()
         rows.append(("Typewriter", names[speed_index], "Story text appears letter by letter. Press any key to skip ahead.",
                      change_typewriter))
+        if hasattr(game, "DEATH_SCROLL_DELAY"):
+            death_names = [name for name, _, _ in DEATH_SPEEDS]
+            death_speed = _run_store().get("settings", {}).get("death_speed", "Medium")
+            death_index = death_names.index(death_speed) if death_speed in death_names else 1
+            def change_death_speed(step, i=death_index):
+                if not 0 <= i + step < len(death_names):
+                    return False
+                _run_store().setdefault("settings", {})["death_speed"] = death_names[i + step]
+                apply_death_speed(death_names[i + step])
+                save_progress()
+            rows.append(("Death scroll", death_names[death_index], "How quickly the screen clears after a death, and the pause before the next life.",
+                         change_death_speed))
         rows.append(("Story area", STORY_AREAS[area][0], "How much of the window the story uses.",
                      lambda step: set_story_area(area + step) if 0 <= area + step < len(STORY_AREAS) else False))
         if hasattr(game, "SIDE_MARGIN"):
