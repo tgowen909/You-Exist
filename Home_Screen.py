@@ -865,6 +865,7 @@ def pause_menu():
 def wait():
     """Waits for a key press, like before, but Esc opens the pause menu."""
     sys.stdout.flush()
+    _skip_typing["on"] = False
     fd = sys.stdin.fileno()
     while True:
         old_settings = termios.tcgetattr(fd)
@@ -888,6 +889,8 @@ _original_input = builtins.input
 def input_with_menu(prompt=""):
     """Typing "menu" at any choice opens the pause menu, just like Esc."""
     while True:
+        sys.stdout.flush()
+        _skip_typing["on"] = False
         answer = _original_input(prompt)
         if answer.strip().lower() != "menu":
             note_answer(answer)
@@ -1124,6 +1127,163 @@ def explore_routes(chapter=None):
             selected = 0
 
 
+# ---------- Typewriter effect ----------
+# When it's on, story text appears letter by letter. It works underneath the word
+# wrapper, so whole words are still moved to the next line properly. Pressing any key
+# while text is typing shows the rest straight away (the key isn't used for anything else).
+TYPEWRITER_SPEEDS = [("Off", 0), ("Slow", 0.045), ("Medium", 0.025), ("Fast", 0.01)]
+_story_running = {"on": False}     # only the story is typed, never the menus
+_skip_typing = {"on": False}
+
+def typewriter_delay():
+    name = _run_store().get("settings", {}).get("typewriter", "Off")
+    return dict(TYPEWRITER_SPEEDS).get(name, 0)
+
+def _key_waiting(fd):
+    try:
+        return bool(select.select([fd], [], [], 0)[0])
+    except (OSError, ValueError):
+        return False
+
+POINTS_COLUMN_DELAY = 0.012        # seconds per column when the points lines appear together
+
+class TypingOutput:
+    def __init__(self, real):
+        self.real = real
+        self.capturing = None          # while a points line is being printed, it's collected here
+        self.pending_points = []       # points lines waiting to appear together
+
+    def write(self, text):
+        if self.capturing is not None:
+            self.capturing.append(text)
+            return len(text)
+        if self.pending_points:
+            self.show_points()
+        delay = typewriter_delay()
+        if not delay or not _story_running["on"] or not _recording["on"] or _skip_typing["on"]:
+            return self.real.write(text)
+        try:
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            single_keys = termios.tcgetattr(fd)
+            single_keys[3] &= ~termios.ICANON        # so a key press can be noticed straight away
+            termios.tcsetattr(fd, termios.TCSANOW, single_keys)
+        except (OSError, ValueError, termios.error):
+            return self.real.write(text)
+        try:
+            # colour codes are written whole; everything else one character at a time
+            for piece in re.findall(r"\x1b\[[0-9;?]*[A-Za-z]|\x1b[78]|\x1b\][^\x07]*\x07|.", text, re.S):
+                self.real.write(piece)
+                if len(piece) == 1 and not piece.isspace() and not _skip_typing["on"]:
+                    self.real.flush()
+                    time.sleep(delay)
+                    if _key_waiting(fd):
+                        os.read(fd, 1024)            # use up the key press
+                        _skip_typing["on"] = True    # show the rest of this part instantly
+        finally:
+            termios.tcsetattr(fd, termios.TCSANOW, old_settings)
+        return len(text)
+
+    def flush(self):
+        if self.capturing is None and self.pending_points:
+            self.show_points()
+        return self.real.flush()
+
+    def show_points(self):
+        """Type all the waiting points lines at the same time, a column at a time,
+        like several cursors typing at once."""
+        text = "".join(self.pending_points)
+        self.pending_points = []
+        lines = text.split("\n")
+        ends_with_newline = lines and lines[-1] == ""
+        if ends_with_newline:
+            lines = lines[:-1]
+        if not ends_with_newline or not lines:
+            self.real.write(text)
+            return
+        # Break each line into (colour codes in effect, character) cells
+        cells = []
+        for line in lines:
+            row, active = [], ""
+            for piece in re.findall(r"\x1b\[[0-9;]*m|\x1b\[[0-9;?]*[A-Za-z]|\x1b[78]|\x1b\][^\x07]*\x07|.", line):
+                if piece.startswith("\x1b"):
+                    if piece.endswith("m"):
+                        active = "" if piece in ("\x1b[0m", "\x1b[m") else active + piece
+                    continue
+                row.append((active, piece))
+            cells.append(row)
+        count = len(cells)
+        if hasattr(game, "story_last_row") and count >= game.story_last_row() - game.story_first_row():
+            self.real.write(text)            # story area too small to type them together
+            return
+        self.real.write("\n" * count)       # make room (scrolling the story if needed)
+        fd = None
+        try:
+            fd = sys.stdin.fileno()
+            old_settings = termios.tcgetattr(fd)
+            single_keys = termios.tcgetattr(fd)
+            single_keys[3] &= ~termios.ICANON
+            termios.tcsetattr(fd, termios.TCSANOW, single_keys)
+        except (OSError, ValueError, termios.error):
+            fd = None
+        try:
+            for column in range(max(len(row) for row in cells)):
+                # go up to the first line, then work down, adding this column's letter to each line
+                step = [f"\033[{count}A"]
+                drew = False
+                for index, row in enumerate(cells):
+                    if column < len(row):
+                        active, char = row[column]
+                        step.append(f"\033[{column + 1}G{active}{char}\033[0m")
+                        drew = drew or not char.isspace()
+                    step.append("\033[1B")      # down to the next line (the last one leads back below them)
+                self.real.write("".join(step))
+                if drew and not _skip_typing["on"]:
+                    self.real.flush()
+                    time.sleep(POINTS_COLUMN_DELAY)
+                    if fd is not None and _key_waiting(fd):
+                        os.read(fd, 1024)
+                        _skip_typing["on"] = True
+        finally:
+            if fd is not None:
+                termios.tcsetattr(fd, termios.TCSANOW, old_settings)
+        self.real.write("\r")               # start of the line just below them, like after a normal print
+
+    def __getattr__(self, name):
+        return getattr(self.real, name)
+
+def install_points_typing():
+    """While the typewriter is on, the points lines (Ponder: 0 and so on) are collected
+    and then typed all at once, instead of one letter at a time like the story."""
+    points = getattr(game, "points", None)
+    if points is None:
+        return
+    for name, function in list(vars(points).items()):
+        func = function.__func__ if isinstance(function, staticmethod) else function
+        if name.startswith("_") or not callable(func) or getattr(func, "_grouped", False):
+            continue
+        def make(func=func):
+            def grouped(*args, **kwargs):
+                out = getattr(sys.stdout, "stream", None)
+                if (not isinstance(out, TypingOutput) or not typewriter_delay()
+                        or not _story_running["on"] or not _recording["on"] or out.capturing is not None):
+                    return func(*args, **kwargs)
+                out.capturing = []
+                try:
+                    return func(*args, **kwargs)
+                finally:
+                    out.pending_points.extend(out.capturing)
+                    out.capturing = None
+            grouped._grouped = True
+            return grouped
+        setattr(points, name, staticmethod(make()))
+
+def install_typewriter():
+    out = sys.stdout
+    if hasattr(out, "stream") and not isinstance(out.stream, TypingOutput):
+        out.stream = TypingOutput(out.stream)
+
+
 # ---------- Settings: text size ----------
 # Mac Terminal lets a program change the text size of its own tab, so the game can
 # offer a text size setting. It's saved, and applied again every time the game opens.
@@ -1241,6 +1401,16 @@ def settings_screen():
         if size is not None:
             rows.append(("Text size", str(size), "",
                          lambda step: set_text_size(size + step) if MIN_TEXT_SIZE <= size + step <= MAX_TEXT_SIZE else False))
+        names = [name for name, _ in TYPEWRITER_SPEEDS]
+        speed = _run_store().get("settings", {}).get("typewriter", "Off")
+        speed_index = names.index(speed) if speed in names else 0
+        def change_typewriter(step, i=speed_index):
+            if not 0 <= i + step < len(names):
+                return False
+            _run_store().setdefault("settings", {})["typewriter"] = names[i + step]
+            save_progress()
+        rows.append(("Typewriter", names[speed_index], "Story text appears letter by letter. Press any key to skip ahead.",
+                     change_typewriter))
         rows.append(("Story area", STORY_AREAS[area][0], "How much of the window the story uses.",
                      lambda step: set_story_area(area + step) if 0 <= area + step < len(STORY_AREAS) else False))
         if hasattr(game, "SIDE_MARGIN"):
@@ -1374,6 +1544,9 @@ def home_screen(namespace=None):
     track_achievements()
 
     apply_saved_settings()
+    install_typewriter()
+    install_points_typing()
+    _story_running["on"] = False
     sys.stdout.write("\033[r\033[?25l")   # use the whole window, and hide the cursor
     try:
         options = ["Play", "Achievements", "Stats", "Settings", "Quit"]
@@ -1414,6 +1587,7 @@ def home_screen(namespace=None):
                     return
     finally:
         # Put the screen back exactly how the story expects it
+        _story_running["on"] = True
         sys.stdout.write("\033[?25h")
         clear()
         game.set_scroll_region()
