@@ -707,6 +707,16 @@ def statistics_screen():
             discoveries_screen()
 
 
+def back_to_story_start():
+    """The story clears the screen with os.system('clear') between lives, which puts the
+    cursor in the very top-left corner. This puts it back inside the margins."""
+    if hasattr(game, "story_home"):
+        game.set_scroll_region()
+        game.story_home()
+        if hasattr(sys.stdout, "col"):
+            sys.stdout.col = 0
+        sys.stdout.flush()
+
 def start_of_life(namespace):
     """Call at the start of each life: saves the run so it can be continued from here.
     A brand new run isn't saved until its first life is over, since continuing it
@@ -715,11 +725,7 @@ def start_of_life(namespace):
     if run is None:
         return
     life = namespace.get("lives_lived", 0) + 1
-    if hasattr(game, "story_home"):
-        game.set_scroll_region()
-        game.story_home()              # start the new life inside the margins again
-        if hasattr(sys.stdout, "col"):
-            sys.stdout.col = 0
+    back_to_story_start()              # start the new life inside the margins again
     track(f"/life/{life}", f"Started life {life}")
     sync_text_size()
     lives = namespace.get("lives_lived", 0)
@@ -746,6 +752,7 @@ def start_of_life(namespace):
 
 def finish_run():
     """Call when a run reaches its ending, so it's no longer offered to continue."""
+    back_to_story_start()              # the ending follows a cleared screen too
     run = getattr(game, "current_run", None)
     track("/run/finished", "Reached the ending", wait_for_it=True)
     if run is not None:
