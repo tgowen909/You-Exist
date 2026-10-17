@@ -76,6 +76,11 @@ keyboard_stopper = pynput.keyboard.Listener(suppress=True) # for some reason you
 
 # Keeps track of the window size. Unlike os.get_terminal_size(), this can be
 # updated in place, so every file that uses size.lines / size.columns sees the new size
+##### Layout #####
+SIDE_MARGIN = 3       # blank columns on the left and right of all text
+TOP_MARGIN = 1        # blank rows above the story
+STORY_AREA = 0.5      # how much of the window's height the story uses (changeable in Settings)
+
 class WindowSize:
     def __init__(self):
         self.update()
@@ -83,7 +88,9 @@ class WindowSize:
     def update(self):
         current = os.get_terminal_size()
         self.lines = current.lines
-        self.columns = current.columns
+        self.full_columns = current.columns
+        # Everything that lays out text uses the width INSIDE the side margins
+        self.columns = max(20, current.columns - 2 * SIDE_MARGIN)
         os.environ['LINES'] = str(self.lines)
         os.environ['COLUMNS'] = str(self.columns)
 
@@ -173,11 +180,22 @@ sys.stdout.write("\033[?1049h")
 sys.stdout.write("\033[2J\033[H")
 # 3. Only let text scroll between row 2 and halfway down the screen
 #    (the same area the old tput command set up), then return the cursor to the top
+def story_first_row():
+    return 1 + TOP_MARGIN
+
+def story_last_row():
+    # the bottom of the story area: STORY_AREA of the window's height, below the top margin
+    return max(story_first_row() + 3, min(size.lines, TOP_MARGIN + int(size.lines * STORY_AREA) + 1))
+
 def set_scroll_region():
-    sys.stdout.write(f"\033[2;{size.lines // 2 + 1}r")
+    sys.stdout.write(f"\033[{story_first_row() + 1};{story_last_row()}r")
+
+def story_home():
+    """Put the cursor where the story starts (top left, inside the margins)."""
+    sys.stdout.write(f"\033[{story_first_row()};1H")
 
 set_scroll_region()
-sys.stdout.write("\033[H")
+story_home()
 sys.stdout.flush()
 
 # 4. Whenever the window is resized, macOS sends the game a SIGWINCH signal.
@@ -194,7 +212,7 @@ def on_resize(signum, frame):
         # Window got shorter: the cursor might now be below the new halfway line,
         # so move it to the bottom of the new text area
         set_scroll_region()
-        sys.stdout.write(f"\033[{size.lines // 2 + 1};1H")
+        sys.stdout.write(f"\033[{story_last_row()};1H")
     sys.stdout.flush()
 
 signal.signal(signal.SIGWINCH, on_resize)
@@ -276,6 +294,8 @@ class WordWrapper:
                     self.stream.write("\n")      # doesn't fit: start a new line
                     self.col = 0
                     self.spaces = ""
+                if self.col == 0 and SIDE_MARGIN:
+                    self.stream.write(" " * SIDE_MARGIN)   # the left margin
                 self.stream.write(self.spaces + piece)
                 self.col = (self.col + len(self.spaces) + len(piece))
                 if self.col > width:             # a single word wider than the window
@@ -301,6 +321,10 @@ sys.stdout = WordWrapper(sys.stdout)
 _original_input = builtins.input
 def _input_with_wrap(prompt=""):
     sys.stdout.flush()
+    margin = " " * SIDE_MARGIN
+    if getattr(sys.stdout, "col", 0) == 0:
+        prompt = margin + prompt
+    prompt = prompt.replace("\n", "\n" + margin)
     answer = _original_input(prompt)
     sys.stdout.col = 0
     return answer
@@ -401,7 +425,7 @@ def die(name, scroll=True):
     except Exception:
         pass   # tracking is never allowed to break the game
     if scroll:
-        ending_lines = (int(size.lines)/2)
+        ending_lines = story_last_row() - story_first_row()
         if ending_lines == 1:
             print()
             ending_lines -= 1

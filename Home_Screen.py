@@ -602,6 +602,17 @@ def _remember_for_redraw(text):
     while _history_length[0] > 20000 and len(_screen_history) > 1:
         _history_length[0] -= len(_screen_history.pop(0))
 
+def go_to_story_start():
+    if hasattr(game, "story_home"):
+        game.story_home()
+    else:
+        sys.stdout.write("\033[H")
+
+def story_height():
+    if hasattr(game, "story_last_row"):
+        return game.story_last_row() - game.story_first_row()
+    return game.size.lines // 2
+
 def redraw_story():
     """Put the story back on screen after the pause menu: the half-screen layout,
     with the most recent lines the player was reading."""
@@ -609,11 +620,11 @@ def redraw_story():
     # keep colours, but drop anything that moves the cursor or clears the screen
     raw = re.sub(r"\x1b\[[0-9;?]*[A-Za-ln-z]|\x1b[78]|\x1b\][^\x07]*\x07|\r", "", raw)
     lines = raw.split("\n")
-    keep = max(1, game.size.lines // 2)
+    keep = max(1, story_height())
     text = "\n".join(lines[-(keep + 1):]).lstrip("\n")
     clear()
     game.set_scroll_region()
-    sys.stdout.write("\033[H")
+    go_to_story_start()
     _recording["on"] = False          # this is a replay, not new story
     try:
         sys.stdout.write(text)
@@ -1168,53 +1179,88 @@ def sync_text_size():
         settings["text_size"] = actual
         save_progress()
 
+STORY_AREAS = [("Small", 1 / 3), ("Medium", 1 / 2), ("Large", 2 / 3), ("Whole window", 1.0)]
+
+def current_story_area():
+    value = getattr(game, "STORY_AREA", 0.5)
+    return min(range(len(STORY_AREAS)), key=lambda i: abs(STORY_AREAS[i][1] - value))
+
+def set_story_area(index):
+    index = max(0, min(len(STORY_AREAS) - 1, index))
+    game.STORY_AREA = STORY_AREAS[index][1]
+    _run_store().setdefault("settings", {})["story_area"] = game.STORY_AREA
+    save_progress()
+
 def apply_saved_settings():
-    size = _run_store().get("settings", {}).get("text_size")
-    if size:
-        _tell_my_tab(_resize_text_command(size))
+    settings = _run_store().get("settings", {})
+    if settings.get("text_size"):
+        _tell_my_tab(_resize_text_command(settings["text_size"]))
+    if settings.get("story_area") and hasattr(game, "STORY_AREA"):
+        game.STORY_AREA = settings["story_area"]
 
 def settings_screen():
     message = ""
+    row = 0                      # 0 = text size, 1 = story area
     sync_text_size()
     while True:
         size = current_text_size()
+        area = current_story_area()
+        rows = []
+        if size is not None:
+            rows.append(("Text size", str(size)))
+        rows.append(("Story area", STORY_AREAS[area][0]))
+        row = min(row, len(rows) - 1)
+        label_width = max(len(label) for label, _ in rows) + 5
+        value_width = max(len(name) for name, _ in STORY_AREAS) + 6
+
         clear()
         draw_title()
         heading = "Settings"
         print(centred(colour(UNLOCKED_COLOUR, heading, bold=True), len(heading)))
         print()
+        for index, (label, value) in enumerate(rows):
+            line = label.ljust(label_width) + f"‹  {value}  ›".center(value_width)
+            if index == row:
+                print(centred(colour(HIGHLIGHT_COLOUR, "›  " + line, bold=True), len(line) + 3))
+            else:
+                print(centred(colour(DIM_COLOUR, "   " + line), len(line) + 3))
+        print()
+        notes = []
         if size is None:
             if os.environ.get("TERM_PROGRAM") == "vscode":
-                first = "Text size can only be changed in the game itself, not in VS Code."
+                notes.append("Text size can only be changed in the game itself, not in VS Code.")
             else:
-                first = "The text size can't be changed from here in this window."
-            lines = [first]
-            for line in lines:
-                print(centred(colour(DIM_COLOUR, fit(line, game.size.columns - 2)), min(len(line), game.size.columns - 2)))
-            hint = "Esc to go back"
-        else:
-            control = f"Text size     ‹  {size}  ›"
-            print(centred(colour(HIGHLIGHT_COLOUR, control, bold=True), len(control)))
-            print()
-            note = message
-            if note:
-                print(centred(colour(DIM_COLOUR, fit(note, game.size.columns - 2)), min(len(note), game.size.columns - 2)))
-            hint = "← → or - + to change the size, Esc to go back"
+                notes.append("The text size can't be changed from here in this window.")
+        if rows[row][0] == "Story area":
+            notes.append("How much of the window the story uses.")
+        if message:
+            notes.append(message)
+        for note in notes:
+            print(centred(colour(DIM_COLOUR, fit(note, game.size.columns - 2)), min(len(note), game.size.columns - 2)))
         print()
+        hint = "↑ ↓ to choose a setting, ← → to change it, Esc to go back"
         print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
         sys.stdout.flush()
 
         key = read_key()
+        message = ""
         if key in ("back", "enter"):
             return
-        if size is not None and key in ("right", "plus", "up"):
-            if size < MAX_TEXT_SIZE:
-                set_text_size(size + 1)
-            message = "" if size < MAX_TEXT_SIZE else "That's the largest size."
-        elif size is not None and key in ("left", "minus", "down"):
-            if size > MIN_TEXT_SIZE:
-                set_text_size(size - 1)
-            message = "" if size > MIN_TEXT_SIZE else "That's the smallest size."
+        if key == "up":
+            row = (row - 1) % len(rows)
+        elif key == "down":
+            row = (row + 1) % len(rows)
+        elif key in ("right", "plus", "left", "minus"):
+            bigger = key in ("right", "plus")
+            if rows[row][0] == "Text size":
+                if bigger and size < MAX_TEXT_SIZE:
+                    set_text_size(size + 1)
+                elif not bigger and size > MIN_TEXT_SIZE:
+                    set_text_size(size - 1)
+                else:
+                    message = "That's the largest size." if bigger else "That's the smallest size."
+            else:
+                set_story_area(area + (1 if bigger else -1))
 
 
 # ---------- Version (shown at the bottom of the home screen) ----------
@@ -1339,5 +1385,5 @@ def home_screen(namespace=None):
         sys.stdout.write("\033[?25h")
         clear()
         game.set_scroll_region()
-        sys.stdout.write("\033[H")
+        go_to_story_start()
         sys.stdout.flush()
