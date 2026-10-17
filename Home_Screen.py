@@ -705,6 +705,7 @@ def start_of_life(namespace):
         return
     life = namespace.get("lives_lived", 0) + 1
     track(f"/life/{life}", f"Started life {life}")
+    sync_text_size()
     lives = namespace.get("lives_lived", 0)
     started = run.get("life_start")
     if started and lives > started.get("life", lives):
@@ -768,6 +769,7 @@ def frozen_keyboard():
 def back_to_home_screen(track_leaving=True):
     """Restart the game, which brings up the home screen. The run was saved
     at the start of this life, so it can be continued from there."""
+    sync_text_size()
     if track_leaving:
         track("/run/left-for-home-screen", "Left a run for the home screen", wait_for_it=True)
     os.environ["YOU_EXIST_RESTARTED"] = "1"   # so the restart isn't counted as a new launch
@@ -826,6 +828,7 @@ def pause_menu():
                 back_to_home_screen()
             elif options[picked] == "Quit":
                 leaving = True
+                sync_text_size()
                 clear()
                 sys.stdout.write("\033[?25h")
                 sys.stdout.flush()
@@ -1101,7 +1104,8 @@ def explore_routes(chapter=None):
 # ---------- Settings: text size ----------
 # Mac Terminal lets a program change the text size of its own tab, so the game can
 # offer a text size setting. It's saved, and applied again every time the game opens.
-# (Players can also press Cmd + and Cmd - at any time, which Terminal handles itself.)
+# If a player uses Terminal's own Cmd + / Cmd - instead, the saved size is kept in step
+# (see sync_text_size), so the game doesn't undo their change next time it opens.
 import subprocess
 MIN_TEXT_SIZE, MAX_TEXT_SIZE = 9, 36
 
@@ -1155,6 +1159,15 @@ def set_text_size(size):
     save_progress()
     return True
 
+def sync_text_size():
+    """If the text size was changed outside the settings (e.g. with Cmd + / Cmd -),
+    save the real size, so it isn't undone the next time the game opens."""
+    actual = current_text_size()
+    settings = _run_store().setdefault("settings", {})
+    if actual and settings.get("text_size") and settings["text_size"] != actual:
+        settings["text_size"] = actual
+        save_progress()
+
 def apply_saved_settings():
     size = _run_store().get("settings", {}).get("text_size")
     if size:
@@ -1162,6 +1175,7 @@ def apply_saved_settings():
 
 def settings_screen():
     message = ""
+    sync_text_size()
     while True:
         size = current_text_size()
         clear()
@@ -1174,7 +1188,7 @@ def settings_screen():
                 first = "Text size can only be changed in the game itself, not in VS Code."
             else:
                 first = "The text size can't be changed from here in this window."
-            lines = [first, "You can still press Cmd + and Cmd - to change it at any time."]
+            lines = [first]
             for line in lines:
                 print(centred(colour(DIM_COLOUR, fit(line, game.size.columns - 2)), min(len(line), game.size.columns - 2)))
             hint = "Esc to go back"
@@ -1182,8 +1196,9 @@ def settings_screen():
             control = f"Text size     ‹  {size}  ›"
             print(centred(colour(HIGHLIGHT_COLOUR, control, bold=True), len(control)))
             print()
-            note = message or "You can also press Cmd + and Cmd - at any time."
-            print(centred(colour(DIM_COLOUR, fit(note, game.size.columns - 2)), min(len(note), game.size.columns - 2)))
+            note = message
+            if note:
+                print(centred(colour(DIM_COLOUR, fit(note, game.size.columns - 2)), min(len(note), game.size.columns - 2)))
             hint = "← → or - + to change the size, Esc to go back"
         print()
         print(centred(colour(DIM_COLOUR, fit(hint, game.size.columns - 2)), min(len(hint), game.size.columns - 2)))
@@ -1299,6 +1314,7 @@ def home_screen(namespace=None):
                     sys.stdout.flush()
             picked = choose(options, draw, picked)
             if picked is None or options[picked] == "Quit":
+                sync_text_size()
                 clear()
                 sys.stdout.write("\033[?25h")
                 sys.stdout.flush()
