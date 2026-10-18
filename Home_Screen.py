@@ -18,6 +18,7 @@ import termios
 import datetime
 import json
 import builtins
+import io
 
 import You_Exist_Imports as game
 
@@ -1252,6 +1253,16 @@ class TypingOutput:
     def __getattr__(self, name):
         return getattr(self.real, name)
 
+POINTS_OPTIONS = ["All shown", "Totals only", "Hidden"]
+
+def points_display():
+    """How much of the points to show: "All shown", "Totals only" (the totals at the
+    start of each life, but not the changes during the story) or "Hidden"."""
+    settings = _run_store().get("settings", {})
+    if "points" in settings:
+        return settings["points"]
+    return "Totals only" if settings.get("point_changes") == "Hidden" else "All shown"   # older saves
+
 def install_points_typing():
     """While the typewriter is on, the points lines (Ponder: 0 and so on) are collected
     and then typed all at once, instead of one letter at a time like the story."""
@@ -1264,6 +1275,16 @@ def install_points_typing():
             continue
         def make(func=func):
             def grouped(*args, **kwargs):
+                change = args[0] if args else kwargs.get("change", 0)
+                display = points_display()
+                if display == "Hidden" or (display == "Totals only" and change):
+                    # the points still change, just silently
+                    real_stdout = sys.stdout
+                    sys.stdout = io.StringIO()
+                    try:
+                        return func(*args, **kwargs)
+                    finally:
+                        sys.stdout = real_stdout
                 out = getattr(sys.stdout, "stream", None)
                 if (not isinstance(out, TypingOutput) or not typewriter_delay()
                         or not _story_running["on"] or not _recording["on"] or out.capturing is not None):
@@ -1434,6 +1455,18 @@ def settings_screen():
                 save_progress()
             rows.append(("Death scroll", death_names[death_index], "How quickly the screen clears after a death, and the pause before the next life.",
                          change_death_speed))
+        display = points_display()
+        display_index = POINTS_OPTIONS.index(display) if display in POINTS_OPTIONS else 0
+        def change_points_display(step, i=display_index):
+            if not 0 <= i + step < len(POINTS_OPTIONS):
+                return False
+            _run_store().setdefault("settings", {})["points"] = POINTS_OPTIONS[i + step]
+            save_progress()
+        points_notes = {"All shown": "Your points at the start of each life, and every change during the story.",
+                        "Totals only": "Your points at the start of each life, but not the changes during the story.",
+                        "Hidden": "No points shown at all. They still change behind the scenes."}
+        rows.append(("Points", POINTS_OPTIONS[display_index], points_notes[POINTS_OPTIONS[display_index]],
+                     change_points_display))
         rows.append(("Story area", STORY_AREAS[area][0], "How much of the window the story uses.",
                      lambda step: set_story_area(area + step) if 0 <= area + step < len(STORY_AREAS) else False))
         if hasattr(game, "SIDE_MARGIN"):
