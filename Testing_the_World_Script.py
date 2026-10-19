@@ -144,7 +144,7 @@ for i, sentence in enumerate(story):
                 buddy.b("Get to know one other, that kind of thing.")
                 buddy.b("After all, we are somewhat stuck together for the foreseeable future.")
                 p("Realising the truth to " + buddy_name + "'s words, you agree.")
-                p("You are torn between asking " + buddy_name + " about its (connection) to you, or instead what it (knows).")
+                print("You are torn between asking " + buddy_name + " about its (connection) to you, or instead what it (knows).")
                 choice = rp(input("> ").lower().strip())
 
                 while choice != "connection" and choice != "knows":
@@ -342,7 +342,7 @@ for i, sentence in enumerate(story):
                     points.charisma(1) # Morality - 1, Charisma + 1
                     buddy.b("Yeah, yeah, okay then.")
                     buddy.b("Off you go.")
-                    p("With bounds and leaps of acceptance from " + buddy_name + ", you must ask yourself: what will you name it?")
+                    print("With bounds and leaps of acceptance from " + buddy_name + ", you must ask yourself: what will you name it?")
                     grumpy_buddy_name = name_buddy.grump(input("> ").strip().capitalize())
 
                     while grumpy_buddy_name == "":
@@ -434,7 +434,7 @@ for i, sentence in enumerate(story):
                         points.charisma(-1) # Charisma - 1
                         buddy.nerd("I can't help but notice you've not decided to name me anything?")
                         buddy.nerd("If that's the case, please do consider handing over the naming rights to myself or, unfortunately, Idiota.")
-                        p("Determined to do things yourself, you wonder what you'll name it.")
+                        print("Determined to do things yourself, you wonder what you'll name it.")
                         nerd_buddy_name = name_buddy.nerd(input("> ").strip().capitalize())
 
                     buddy.nerd("*sigh*")
