@@ -40,6 +40,7 @@ EXACT_COLOURS = {
 # Format:  (R, G, B): 256-colour code   (chart: https://www.ditig.com/256-colors-cheat-sheet)
 FALLBACK_COLOURS = {
     (126, 58, 56): 52,    # the being: very dark red (lighter options: 88, then 95)
+    (35, 79, 26): 28,     # the nerd (Craig): dark green (darker option: 22)
 }
 
 def cprint(text, color=None, on_color=None, attrs=None, **kwargs):
@@ -258,6 +259,10 @@ def rgb_to_256(r, g, b):
     grey = 8 + 10 * gi_
     grey_code = 232 + gi_
     dist = lambda c: (c[0] - r) ** 2 + (c[1] - g) ** 2 + (c[2] - b) ** 2
+    # Only use a grey for colours that are nearly grey already. Otherwise a dark colour
+    # (like the nerd's dark green) can end up closer to a grey than to any colour.
+    if max(r, g, b) - min(r, g, b) > 30:
+        return cube_code
     return grey_code if dist((grey, grey, grey)) < dist(cube) else cube_code
 
 def _fix_colour_code(code):
